@@ -402,7 +402,7 @@ export const MonthlyReportView: React.FC = () => {
                             <td className="py-2.5 px-3 text-slate-600 font-medium">
                               {t.projectName} ({t.clientName})
                             </td>
-                            <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{t.dueDate}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">{t.dueDate || <span className="text-slate-400 font-sans italic">No deadline</span>}</td>
                             <td className="py-2.5 px-3 whitespace-nowrap">
                               <StatusBadge status={t.status} size="sm" />
                             </td>

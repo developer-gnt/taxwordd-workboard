@@ -43,13 +43,28 @@ export const UserCombobox: React.FC<UserComboboxProps> = ({
         if (selectedUser) {
           setQuery(`${selectedUser.name} (${selectedUser.role}${selectedUser.department ? ` • ${selectedUser.department}` : ''})`);
         } else if (!value) {
+          if (query.trim()) {
+            const q = query.trim().toLowerCase();
+            const matched = users.find(
+              (u) =>
+                u.name.toLowerCase() === q ||
+                u.email.toLowerCase() === q ||
+                u.name.toLowerCase().startsWith(q) ||
+                q.startsWith(u.name.toLowerCase())
+            );
+            if (matched) {
+              onChange(matched.id);
+              setQuery(`${matched.name} (${matched.role}${matched.department ? ` • ${matched.department}` : ''})`);
+              return;
+            }
+          }
           setQuery('');
         }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [selectedUser, value]);
+  }, [selectedUser, value, query, users, onChange]);
 
   // Filter active users based on query
   const filteredUsers = users.filter((u) => {

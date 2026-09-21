@@ -20,8 +20,8 @@ export const ProjectProgressCard: React.FC<ProjectProgressCardProps> = ({ projec
     const projTasks = tasks.filter((t) => t.projectId === proj.id);
     const total = projTasks.length;
     const completed = projTasks.filter((t) => t.status === 'DONE').length;
-    const dueToday = projTasks.filter((t) => t.dueDate === todayStr && t.status !== 'DONE').length;
-    const overdue = projTasks.filter((t) => t.dueDate < todayStr && t.status !== 'DONE').length;
+    const dueToday = projTasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
+    const overdue = projTasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;
     const blocked = projTasks.filter((t) => t.status === 'BLOCKED').length;
     const active = total - completed;
     const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -51,7 +51,7 @@ export const ProjectProgressCard: React.FC<ProjectProgressCardProps> = ({ projec
     // 4. Status active over archived
     if (a.project.status === 'ACTIVE' && b.project.status !== 'ACTIVE') return -1;
     if (b.project.status === 'ACTIVE' && a.project.status !== 'ACTIVE') return 1;
-    return a.project.projectName.localeCompare(b.project.projectName);
+    return (a.project?.projectName || '').localeCompare(b.project?.projectName || '');
   });
 
   const MAX_DISPLAY = 10;

@@ -158,7 +158,7 @@ export const EmployeeMonthlySummaryView: React.FC = () => {
                 <tr key={t.taskId} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-2.5 px-4 font-bold text-slate-900">{t.title}</td>
                   <td className="py-2.5 px-3 text-slate-600">{t.projectName}</td>
-                  <td className="py-2.5 px-3 font-mono">{t.dueDate}</td>
+                  <td className="py-2.5 px-3 font-mono">{t.dueDate || <span className="text-slate-400 font-sans italic">No deadline</span>}</td>
                   <td className="py-2.5 px-3">
                     <StatusBadge status={t.status} size="sm" />
                   </td>

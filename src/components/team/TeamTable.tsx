@@ -130,7 +130,12 @@ export const TeamTable: React.FC<TeamTableProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedUsers.map((u) => {
-                const userTasks = tasks.filter((t) => t.assignedEmployeeId === u.id);
+                const userTasks = tasks.filter(
+                  (t) =>
+                    t.assignedEmployeeId === u.id ||
+                    (u.email && t.assignedEmployeeId?.toLowerCase() === u.email.toLowerCase()) ||
+                    (t.assignedEmployeeName && t.assignedEmployeeName !== 'Unassigned' && t.assignedEmployeeName.toLowerCase().trim() === u.name.toLowerCase().trim())
+                );
                 const activeCount = userTasks.filter((t) => t.status !== 'DONE').length;
                 const completedCount = userTasks.filter((t) => t.status === 'DONE').length;
                 const isCurrentSelf = currentUser?.id === u.id;

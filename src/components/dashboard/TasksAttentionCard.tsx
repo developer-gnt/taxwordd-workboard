@@ -149,9 +149,9 @@ export const TasksAttentionCard: React.FC<TasksAttentionCardProps> = ({ tasks })
           </div>
         ) : (
           displayedTasks.map((task) => {
-            const isOverdue = task.status !== 'DONE' && task.dueDate < todayStr;
+            const isOverdue = task.status !== 'DONE' && !!(task.dueDate && task.dueDate < todayStr);
             const isBlocked = task.status === 'BLOCKED';
-            const isDueToday = task.status !== 'DONE' && task.dueDate === todayStr;
+            const isDueToday = task.status !== 'DONE' && !!(task.dueDate && task.dueDate === todayStr);
             const isReview = task.status === 'REVIEW';
 
             // Distinct status banner per issue type

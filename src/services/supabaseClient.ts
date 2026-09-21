@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   created_by_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
   created_by_name TEXT NOT NULL,
   priority TEXT NOT NULL DEFAULT 'MEDIUM' CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),
-  due_date DATE NOT NULL,
+  due_date DATE,
   status TEXT NOT NULL DEFAULT 'NOT_STARTED' CHECK (status IN ('NOT_STARTED', 'IN_PROGRESS', 'REVIEW', 'BLOCKED', 'DONE')),
   progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   blocker TEXT,
@@ -162,24 +162,29 @@ ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies: Restrict to authenticated users only
--- NOTE: For stronger security, replace these with user-specific policies
+-- RLS Policies: Support both PIN and Supabase Auth logins across devices
 DROP POLICY IF EXISTS "Allow authenticated access users" ON public.users;
-CREATE POLICY "Allow authenticated access users" ON public.users FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all access users" ON public.users;
+CREATE POLICY "Allow all access users" ON public.users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow authenticated access projects" ON public.projects;
-CREATE POLICY "Allow authenticated access projects" ON public.projects FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all access projects" ON public.projects;
+CREATE POLICY "Allow all access projects" ON public.projects FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow authenticated access tasks" ON public.tasks;
-CREATE POLICY "Allow authenticated access tasks" ON public.tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all access tasks" ON public.tasks;
+CREATE POLICY "Allow all access tasks" ON public.tasks FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow authenticated access activities" ON public.activities;
-CREATE POLICY "Allow authenticated access activities" ON public.activities FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all access activities" ON public.activities;
+CREATE POLICY "Allow all access activities" ON public.activities FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow authenticated access notifications" ON public.notifications;
-CREATE POLICY "Allow authenticated access notifications" ON public.notifications FOR ALL TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow all access notifications" ON public.notifications;
+CREATE POLICY "Allow all access notifications" ON public.notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
--- Migration: Add was_overdue column if it does not exist yet
+-- Migration: Ensure optional due_date and was_overdue column exist
+ALTER TABLE public.tasks ALTER COLUMN due_date DROP NOT NULL;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS was_overdue BOOLEAN DEFAULT false;
 
 -- Enable Realtime for all tables (Idempotent)

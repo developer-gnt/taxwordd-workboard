@@ -20,8 +20,8 @@ export const WorkloadCard: React.FC<WorkloadCardProps> = ({ users, tasks }) => {
     .map((u) => {
       const userTasks = tasks.filter((t) => t.assignedEmployeeId === u.id);
       const active = userTasks.filter((t) => t.status !== 'DONE').length;
-      const dueToday = userTasks.filter((t) => t.dueDate === todayStr && t.status !== 'DONE').length;
-      const overdue = userTasks.filter((t) => t.dueDate < todayStr && t.status !== 'DONE').length;
+      const dueToday = userTasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
+      const overdue = userTasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;
       const blocked = userTasks.filter((t) => t.status === 'BLOCKED').length;
       const completed = userTasks.filter((t) => t.status === 'DONE').length;
 
@@ -40,7 +40,7 @@ export const WorkloadCard: React.FC<WorkloadCardProps> = ({ users, tasks }) => {
       const urgencyA = a.blocked * 100 + a.overdue * 10 + a.dueToday * 5 + a.active;
       const urgencyB = b.blocked * 100 + b.overdue * 10 + b.dueToday * 5 + b.active;
       if (urgencyA !== urgencyB) return urgencyB - urgencyA;
-      return a.user.name.localeCompare(b.user.name);
+      return (a.user?.name || '').localeCompare(b.user?.name || '');
     });
 
   const handleUserClick = (employeeId: string) => {

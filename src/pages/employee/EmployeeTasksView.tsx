@@ -39,9 +39,24 @@ export const EmployeeTasksView: React.FC<EmployeeTasksViewProps> = ({
 
   // Filter tasks belonging strictly to current employee
   const myTasks = tasks.filter((t) => {
-    const matchId = t.assignedEmployeeId && t.assignedEmployeeId === currentUser.id;
-    const matchEmail = currentUser.email && (t.assignedEmployeeId?.toLowerCase() === currentUser.email.toLowerCase() || t.assignedEmployeeName?.toLowerCase() === currentUser.email.toLowerCase());
-    const matchName = currentUser.name && t.assignedEmployeeName && t.assignedEmployeeName.toLowerCase().trim() === currentUser.name.toLowerCase().trim();
+    const matchId = Boolean(
+      t.assignedEmployeeId &&
+      (t.assignedEmployeeId === currentUser.id ||
+        t.assignedEmployeeId.replace('usr-', 'user-') === currentUser.id.replace('usr-', 'user-'))
+    );
+    const matchEmail = Boolean(
+      currentUser.email &&
+      (t.assignedEmployeeId?.toLowerCase() === currentUser.email.toLowerCase() ||
+        t.assignedEmployeeName?.toLowerCase() === currentUser.email.toLowerCase())
+    );
+    const matchName = Boolean(
+      currentUser.name &&
+      t.assignedEmployeeName &&
+      t.assignedEmployeeName !== 'Unassigned' &&
+      (t.assignedEmployeeName.toLowerCase().trim() === currentUser.name.toLowerCase().trim() ||
+        t.assignedEmployeeName.toLowerCase().trim().includes(currentUser.name.toLowerCase().trim()) ||
+        currentUser.name.toLowerCase().trim().includes(t.assignedEmployeeName.toLowerCase().trim()))
+    );
     return Boolean(matchId || matchEmail || matchName);
   });
 

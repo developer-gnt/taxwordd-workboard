@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { User, Task, Project, TaskActivity, Notification, TaskStatus, TaskPriority, ProjectStatus, UserRole } from '../types';
 import { formatLocalDateDisplay, getLocalDateString } from '../utils/dateUtils';
 import { storageService } from '../services/storageService';
@@ -39,6 +39,7 @@ interface AppContextType {
     projectId?: string;
     quickFilter?: 'all' | 'today' | 'upcoming' | 'overdue' | 'blocked' | 'completed';
     search?: string;
+    dueDate?: string;
   };
 
   // Actions
@@ -79,6 +80,7 @@ interface AppContextType {
     referenceLink?: string;
     estimatedEffort?: string;
     expectedCompletionDate?: string;
+    attachments?: any[];
   }) => Promise<{ success: boolean; message: string; task?: Task }>;
 
   employeeUpdateTask: (
@@ -186,8 +188,20 @@ const getAuthorizedRoute = (route: string, user: User | null): string => {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+// Maps notification type → toast style
+const getToastTypeForNotifType = (
+  type: string
+): 'success' | 'error' | 'info' | 'warning' => {
+  if (type === 'COMPLETED') return 'success';
+  if (type === 'BLOCKED') return 'error';
+  if (type === 'OVERDUE' || type === 'DUE_TODAY' || type === 'PERIOD_CLOSING') return 'warning';
+  return 'info';
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Initialize from localStorage cache for instant first render,
+  // then immediately overridden by Supabase sync on mount.
   const [users, setUsers] = useState<User[]>(() => storageService.getUsers());
   const [projects, setProjects] = useState<Project[]>(() => storageService.getProjects());
   const [tasks, setTasks] = useState<Task[]>(() => storageService.getTasks());
@@ -203,6 +217,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     search: '',
     dueDate: '',
   }));
+
+  // Tracks notification IDs already seen by the current user to detect new ones
+  const prevNotifIdsRef = useRef<Set<string>>(new Set());
+  const prevUserIdRef = useRef<string | null>(null);
 
   const updateRoute = useCallback((newRoute: string) => {
     setActiveRoute(newRoute);
@@ -229,6 +247,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivities(allActivities);
     setNotifications(allNotifs);
     setCurrentUser(curr);
+
+    // ── Live popup toast for new notifications ──────────────────────────────
+    if (curr) {
+      const userNotifs = allNotifs.filter((n) => n.userId === curr.id && !n.read);
+      const isSameUser = prevUserIdRef.current === curr.id;
+      const prevIds = prevNotifIdsRef.current;
+
+      if (isSameUser && prevIds.size > 0) {
+        // Find notifications that weren't in the previous snapshot
+        const newOnes = userNotifs.filter((n) => !prevIds.has(n.id));
+        if (newOnes.length > 0) {
+          setToasts((prev) => {
+            const additions: ToastMessage[] = newOnes.map((n) => ({
+              id: `toast-notif-${n.id}`,
+              type: getToastTypeForNotifType(n.type),
+              title: n.title,
+              message: n.message,
+              duration: 7000,
+            }));
+            // Deduplicate: skip if toast for this notif already queued
+            const existingIds = new Set(prev.map((t) => t.id));
+            return [...prev, ...additions.filter((a) => !existingIds.has(a.id))];
+          });
+        }
+      }
+
+      prevUserIdRef.current = curr.id;
+      prevNotifIdsRef.current = new Set(userNotifs.map((n) => n.id));
+    } else {
+      prevUserIdRef.current = null;
+      prevNotifIdsRef.current = new Set();
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     if (curr) {
       setActiveRoute((prev) => {

@@ -137,6 +137,15 @@ class StorageService {
   }
 
   public async saveUser(user: User): Promise<boolean> {
+    // PRIMARY: Write to Supabase first (source of truth)
+    let syncedToCloud = false;
+    try {
+      syncedToCloud = await supabaseDb.upsertUser(user);
+    } catch (e) {
+      console.warn('Supabase save user error (caching locally):', e);
+    }
+
+    // CACHE: Update localStorage for instant reads
     const users = this.getUsers();
     const idx = users.findIndex((u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
     if (idx >= 0) {
@@ -145,23 +154,21 @@ class StorageService {
       users.push(user);
     }
     this.setItem(STORAGE_KEYS.USERS, users);
-    try {
-      return await supabaseDb.upsertUser(user);
-    } catch (e) {
-      console.warn('Supabase save user error:', e);
-      return false;
-    }
+    return syncedToCloud;
   }
 
   public async deleteUser(userId: string): Promise<boolean> {
+    // PRIMARY: Delete from Supabase first
+    let deleted = false;
+    try {
+      deleted = await supabaseDb.deleteUser(userId);
+    } catch (e) {
+      console.warn('Supabase delete user error (removing locally):', e);
+    }
+    // CACHE: Remove from localStorage
     const users = this.getUsers().filter((u) => u.id !== userId);
     this.setItem(STORAGE_KEYS.USERS, users);
-    try {
-      return await supabaseDb.deleteUser(userId);
-    } catch (e) {
-      console.warn('Supabase delete user error:', e);
-      return false;
-    }
+    return deleted;
   }
 
   // ==================== PROJECTS ====================
@@ -177,6 +184,15 @@ class StorageService {
   }
 
   public async saveProject(project: Project): Promise<boolean> {
+    // PRIMARY: Write to Supabase first (source of truth)
+    let syncedToCloud = false;
+    try {
+      syncedToCloud = await supabaseDb.upsertProject(project);
+    } catch (e) {
+      console.warn('Supabase save project error (caching locally):', e);
+    }
+
+    // CACHE: Update localStorage for instant reads
     const projects = this.getProjects();
     const idx = projects.findIndex((p) => p.id === project.id);
     if (idx >= 0) {
@@ -185,23 +201,21 @@ class StorageService {
       projects.unshift(project);
     }
     this.setItem(STORAGE_KEYS.PROJECTS, projects);
-    try {
-      return await supabaseDb.upsertProject(project);
-    } catch (e) {
-      console.warn('Supabase save project error:', e);
-      return false;
-    }
+    return syncedToCloud;
   }
 
   public async deleteProject(projectId: string): Promise<boolean> {
+    // PRIMARY: Delete from Supabase first
+    let deleted = false;
+    try {
+      deleted = await supabaseDb.deleteProject(projectId);
+    } catch (e) {
+      console.warn('Supabase delete project error (removing locally):', e);
+    }
+    // CACHE: Remove from localStorage
     const projects = this.getProjects().filter((p) => p.id !== projectId);
     this.setItem(STORAGE_KEYS.PROJECTS, projects);
-    try {
-      return await supabaseDb.deleteProject(projectId);
-    } catch (e) {
-      console.warn('Supabase delete project error:', e);
-      return false;
-    }
+    return deleted;
   }
 
   // ==================== TASKS ====================
@@ -217,6 +231,15 @@ class StorageService {
   }
 
   public async saveTask(task: Task): Promise<boolean> {
+    // PRIMARY: Write to Supabase first (source of truth)
+    let syncedToCloud = false;
+    try {
+      syncedToCloud = await supabaseDb.upsertTask(task);
+    } catch (e) {
+      console.warn('Supabase save task error (caching locally):', e);
+    }
+
+    // CACHE: Update localStorage for instant UI reads
     const tasks = this.getTasks();
     const idx = tasks.findIndex((t) => t.id === task.id);
     if (idx >= 0) {
@@ -225,23 +248,21 @@ class StorageService {
       tasks.unshift(task);
     }
     this.setItem(STORAGE_KEYS.TASKS, tasks);
-    try {
-      return await supabaseDb.upsertTask(task);
-    } catch (e) {
-      console.warn('Supabase save task error:', e);
-      return false;
-    }
+    return syncedToCloud;
   }
 
   public async deleteTask(taskId: string): Promise<boolean> {
+    // PRIMARY: Delete from Supabase first
+    let deleted = false;
+    try {
+      deleted = await supabaseDb.deleteTask(taskId);
+    } catch (e) {
+      console.warn('Supabase delete task error (removing locally):', e);
+    }
+    // CACHE: Remove from localStorage
     const tasks = this.getTasks().filter((t) => t.id !== taskId);
     this.setItem(STORAGE_KEYS.TASKS, tasks);
-    try {
-      return await supabaseDb.deleteTask(taskId);
-    } catch (e) {
-      console.warn('Supabase delete task error:', e);
-      return false;
-    }
+    return deleted;
   }
 
   // ==================== ACTIVITIES ====================

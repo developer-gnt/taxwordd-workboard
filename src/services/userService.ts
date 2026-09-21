@@ -73,8 +73,7 @@ class UserService {
       updatedAt: new Date().toISOString(),
     };
 
-    users.push(newUser);
-    storageService.setUsers(users);
+    await storageService.saveUser(newUser);
 
     return { success: true, user: newUser, message: 'Team member added successfully.' };
   }
@@ -107,7 +106,8 @@ class UserService {
     targetUser.active = !targetUser.active;
     targetUser.updatedAt = new Date().toISOString();
     users[targetIndex] = targetUser;
-    storageService.setUsers(users);
+    // Supabase-first: persist active status change directly to cloud
+    await storageService.saveUser(targetUser);
 
     const actionWord = targetUser.active ? 'activated' : 'deactivated';
     return {
@@ -237,7 +237,13 @@ class UserService {
         return newT;
       });
       if (tasksChanged) {
-        storageService.setTasks(syncedTasks);
+        // Supabase-first: push each changed task individually
+        for (const t of syncedTasks) {
+          if (t.updatedAt > (users[targetIndex]?.updatedAt || '')) {
+            storageService.saveTask(t).catch(() => {});
+          }
+        }
+        storageService.setTasks(syncedTasks, false); // update localStorage cache without re-upsert
       }
     }
 
@@ -290,7 +296,13 @@ class UserService {
       return t;
     });
     if (tasksModified) {
-      storageService.setTasks(updatedTasks);
+      // Supabase-first: push each reassigned task directly
+      for (const t of updatedTasks) {
+        if (t.assignedEmployeeId === '' && t.updatedAt) {
+          storageService.saveTask(t).catch(() => {});
+        }
+      }
+      storageService.setTasks(updatedTasks, false); // update localStorage cache without re-upsert
     }
 
     // Delete user from local storage and Supabase cloud DB

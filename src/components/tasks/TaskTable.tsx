@@ -480,13 +480,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   const ownerInitials = task.assignedEmployeeName
                     ? task.assignedEmployeeName
                         .split(' ')
+                        .filter(Boolean)
                         .map((s) => s[0])
                         .join('')
                         .slice(0, 2)
                     : '--';
 
                   let delayText = 'Delayed';
-                  if (wasCompletedOverdue && task.completedAt) {
+                  if (wasCompletedOverdue && task.completedAt && task.dueDate) {
                     const d1 = new Date(task.dueDate);
                     const d2 = new Date(task.completedAt.split('T')[0]);
                     const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
@@ -496,7 +497,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   }
 
                   let overdueText = 'Overdue';
-                  if (isOverdue) {
+                  if (isOverdue && task.dueDate) {
                     const d1 = new Date(task.dueDate);
                     const d2 = new Date(todayStr);
                     const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
@@ -574,17 +575,23 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       {/* Due Date */}
                       <td className="py-3 px-3 whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span
-                            className={`font-semibold ${
-                              isOverdue
-                                ? 'text-rose-600'
-                                : isDueToday
-                                ? 'text-amber-700'
-                                : 'text-slate-700'
-                            }`}
-                          >
-                            {task.dueDate || 'No due date'}
-                          </span>
+                          {task.dueDate ? (
+                            <span
+                              className={`font-semibold ${
+                                isOverdue
+                                  ? 'text-rose-600'
+                                  : isDueToday
+                                  ? 'text-amber-700'
+                                  : 'text-slate-700'
+                              }`}
+                            >
+                              {task.dueDate}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-normal text-xs italic">
+                              No deadline
+                            </span>
+                          )}
                           {isOverdue && (
                             <span className="text-[10px] font-bold text-rose-600 uppercase">
                               {overdueText}

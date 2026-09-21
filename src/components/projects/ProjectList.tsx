@@ -176,8 +176,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({
             const projTasks = tasks.filter((t) => t.projectId === proj.id);
             const total = projTasks.length;
             const completed = projTasks.filter((t) => t.status === 'DONE').length;
-            const overdue = projTasks.filter((t) => t.dueDate < todayStr && t.status !== 'DONE').length;
-            const dueToday = projTasks.filter((t) => t.dueDate === todayStr && t.status !== 'DONE').length;
+            const overdue = projTasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;
+            const dueToday = projTasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
             const blocked = projTasks.filter((t) => t.status === 'BLOCKED').length;
             const activeDeliverables = total - completed;
             const pct = total > 0 ? Math.round((completed / total) * 100) : 0;

@@ -210,9 +210,20 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, isOpen, onCl
             </div>
 
             <div>
-              <label htmlFor="edit-task-due-date" className="block font-bold text-slate-700 mb-1">
-                Due Date <span className="text-slate-400 font-normal text-xs">(Optional)</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="edit-task-due-date" className="font-bold text-slate-700">
+                  Due Date <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                </label>
+                {dueDate && (
+                  <button
+                    type="button"
+                    onClick={() => setDueDate('')}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <input
                 id="edit-task-due-date"
                 type="date"

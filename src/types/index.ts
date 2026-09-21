@@ -12,6 +12,8 @@ export type NotificationType =
   | 'OVERDUE'
   | 'BLOCKED'
   | 'RETURNED_FOR_REVIEW'
+  | 'COMPLETED'
+  | 'STATUS_CHANGE'
   | 'MONTHLY_REPORT_AVAILABLE'
   | 'PERIOD_CLOSING';
 

@@ -49,8 +49,13 @@ class ReportService {
     // 1) Its dueDate falls in the target month, OR
     // 2) It was completed in this month, OR
     // 3) It was active during this month (created <= endDate and (not completed or completed >= startDate))
+    // Date-based task filtering for this month:
+    // A task belongs to this reporting window if:
+    // 1) Its dueDate falls in the target month, OR
+    // 2) It was completed in this month, OR
+    // 3) It was active during this month (created <= endDate and (not completed or completed >= startDate))
     let relevantTasks = allTasks.filter((t) => {
-      const dueInMonth = t.dueDate >= startDate && t.dueDate <= endDate;
+      const dueInMonth = t.dueDate ? (t.dueDate >= startDate && t.dueDate <= endDate) : false;
       const completedInMonth = t.completedAt ? this.isSameMonth(t.completedAt.split('T')[0], targetMonth) : false;
       const activeInMonth = t.createdAt.split('T')[0] <= endDate && (!t.completedAt || t.completedAt.split('T')[0] >= startDate);
 
@@ -59,7 +64,15 @@ class ReportService {
 
     // Apply user filters
     if (filter.employeeId) {
-      relevantTasks = relevantTasks.filter((t) => t.assignedEmployeeId === filter.employeeId);
+      const targetUser = allUsers.find((u) => u.id === filter.employeeId);
+      relevantTasks = relevantTasks.filter((t) => {
+        if (t.assignedEmployeeId === filter.employeeId) return true;
+        if (targetUser) {
+          if (targetUser.email && t.assignedEmployeeId?.toLowerCase() === targetUser.email.toLowerCase()) return true;
+          if (targetUser.name && t.assignedEmployeeName && t.assignedEmployeeName.toLowerCase().trim() === targetUser.name.toLowerCase().trim()) return true;
+        }
+        return false;
+      });
     }
     if (filter.projectId) {
       relevantTasks = relevantTasks.filter((t) => t.projectId === filter.projectId);
@@ -71,10 +84,10 @@ class ReportService {
       relevantTasks = relevantTasks.filter((t) => t.priority === filter.priority);
     }
     if (filter.dueDateFrom) {
-      relevantTasks = relevantTasks.filter((t) => t.dueDate >= filter.dueDateFrom!);
+      relevantTasks = relevantTasks.filter((t) => t.dueDate && t.dueDate >= filter.dueDateFrom!);
     }
     if (filter.dueDateTo) {
-      relevantTasks = relevantTasks.filter((t) => t.dueDate <= filter.dueDateTo!);
+      relevantTasks = relevantTasks.filter((t) => t.dueDate && t.dueDate <= filter.dueDateTo!);
     }
 
     // 1. Calculate Monthly Summary Metrics
@@ -92,20 +105,22 @@ class ReportService {
 
       if (isDone) {
         completedCount++;
-        // On-time check: completed on or before due date
+        // On-time check: completed on or before due date (if due date exists)
         const compDate = t.completedAt ? t.completedAt.split('T')[0] : t.updatedAt.split('T')[0];
-        if (compDate <= t.dueDate) {
+        if (!t.dueDate || compDate <= t.dueDate) {
           onTimeCount++;
         }
       } else {
         activeCount++;
         if (isBlocked) blockedCount++;
 
-        // Overdue check
-        if (t.dueDate < todayStr) {
-          overdueCount++;
-        } else if (t.dueDate >= todayStr && t.dueDate <= this.addDays(todayStr, 3)) {
-          dueSoonCount++;
+        // Overdue check (only if due date is set)
+        if (t.dueDate) {
+          if (t.dueDate < todayStr) {
+            overdueCount++;
+          } else if (t.dueDate >= todayStr && t.dueDate <= this.addDays(todayStr, 3)) {
+            dueSoonCount++;
+          }
         }
       }
 
@@ -137,7 +152,12 @@ class ReportService {
       : allUsers.filter((u) => u.role === 'EMPLOYEE' || u.role === 'MANAGER' || employeeIds.includes(u.id));
 
     const employeePerformance: EmployeePerformanceSummary[] = targetEmployees.map((emp) => {
-      const empTasks = relevantTasks.filter((t) => t.assignedEmployeeId === emp.id);
+      const empTasks = relevantTasks.filter(
+        (t) =>
+          t.assignedEmployeeId === emp.id ||
+          (emp.email && t.assignedEmployeeId?.toLowerCase() === emp.email.toLowerCase()) ||
+          (t.assignedEmployeeName && t.assignedEmployeeName.toLowerCase().trim() === emp.name.toLowerCase().trim())
+      );
       const assigned = empTasks.length;
       let completed = 0;
       let onTime = 0;
@@ -149,11 +169,11 @@ class ReportService {
         if (t.status === 'DONE') {
           completed++;
           const compDate = t.completedAt ? t.completedAt.split('T')[0] : t.updatedAt.split('T')[0];
-          if (compDate <= t.dueDate) onTime++;
+          if (!t.dueDate || compDate <= t.dueDate) onTime++;
         } else {
           active++;
           if (t.status === 'BLOCKED') blocked++;
-          if (t.dueDate < todayStr) overdue++;
+          if (t.dueDate && t.dueDate < todayStr) overdue++;
         }
       });
 
@@ -192,7 +212,7 @@ class ReportService {
           } else {
             active++;
             if (t.status === 'BLOCKED') blocked++;
-            if (t.dueDate < todayStr) overdue++;
+            if (t.dueDate && t.dueDate < todayStr) overdue++;
           }
         });
 
@@ -214,19 +234,19 @@ class ReportService {
     const detailedTasks: DetailedTaskReportRow[] = relevantTasks.map((t) => {
       const compDate = t.completedAt ? t.completedAt.split('T')[0] : undefined;
       const isDone = t.status === 'DONE';
-      // A task is on-time only if completed and compDate <= dueDate
-      const isOnTime = isDone && compDate ? compDate <= t.dueDate : false;
+      // A task is on-time if completed and (no dueDate or compDate <= dueDate)
+      const isOnTime = isDone ? (!t.dueDate || (compDate ? compDate <= t.dueDate : true)) : false;
       // A task is overdue if still active and past due date
-      const isOverdue = !isDone && t.dueDate < todayStr;
+      const isOverdue = !isDone && t.dueDate ? t.dueDate < todayStr : false;
       // A task was completed but late (delayed)
-      const wasCompletedLate = isDone && (t.wasOverdue === true || (compDate ? compDate > t.dueDate : false));
+      const wasCompletedLate = isDone && t.dueDate ? (t.wasOverdue === true || (compDate ? compDate > t.dueDate : false)) : false;
       // Calculate delay in days for completed-late tasks
       let delayDays = 0;
-      if (wasCompletedLate && compDate) {
+      if (wasCompletedLate && compDate && t.dueDate) {
         const d1 = new Date(t.dueDate);
         const d2 = new Date(compDate);
         delayDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-      } else if (isOverdue) {
+      } else if (isOverdue && t.dueDate) {
         const d1 = new Date(t.dueDate);
         const d2 = new Date(todayStr);
         delayDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));

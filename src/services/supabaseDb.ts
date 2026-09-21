@@ -528,6 +528,38 @@ export class SupabaseDbService {
     }
   }
 
+  public async deleteNotification(notificationId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
+      if (error) {
+        console.error('Supabase deleteNotification error:', error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Supabase deleteNotification exception:', e);
+      return false;
+    }
+  }
+
+  public async deleteNotificationsForUser(userId: string, readOnly = false): Promise<boolean> {
+    try {
+      let query = supabase.from('notifications').delete().eq('user_id', userId);
+      if (readOnly) {
+        query = query.eq('read', true);
+      }
+      const { error } = await query;
+      if (error) {
+        console.error('Supabase deleteNotificationsForUser error:', error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Supabase deleteNotificationsForUser exception:', e);
+      return false;
+    }
+  }
+
   // ==================== FULL INITIAL SYNC ====================
   public async performFullSync(
     localData: {
@@ -636,46 +668,37 @@ export class SupabaseDbService {
         }
       }
 
-      // Timestamp-aware Last-Write-Wins merge for tasks
+      // Supabase-authoritative merge for tasks:
+      // - Supabase is the source of truth for all existing tasks
+      // - Local-only tasks (offline / pre-.env) are pushed to Supabase immediately
       if (remoteTasks !== null) {
         if (remoteTasks.length > 0) {
-          const localMap = new Map(localData.tasks.map((t) => [t.id, t]));
-          const merged: Task[] = [];
-          const toPush: Task[] = [];
-
-          for (const rTask of remoteTasks) {
-            const lTask = localMap.get(rTask.id);
-            if (!lTask) {
-              merged.push(rTask);
-            } else {
-              const lTime = new Date(lTask.updatedAt || lTask.createdAt || 0).getTime();
-              const rTime = new Date(rTask.updatedAt || rTask.createdAt || 0).getTime();
-              if (lTime > rTime) {
-                merged.push(lTask);
-                toPush.push(lTask);
-              } else {
-                merged.push(rTask);
-              }
-            }
-          }
-
-          // Also include any newly created local tasks that haven't reached remote yet
           const remoteIds = new Set(remoteTasks.map((t) => t.id));
+          const localOnlyTasks: Task[] = [];
+
           for (const lTask of localData.tasks) {
             if (!remoteIds.has(lTask.id)) {
-              merged.unshift(lTask);
-              toPush.push(lTask);
+              // Local-only task — push it to Supabase immediately
+              localOnlyTasks.push(lTask);
             }
           }
 
-          finalTasks = merged;
-          if (toPush.length > 0) {
-            for (const t of toPush) {
+          // Push all local-only tasks to Supabase
+          if (localOnlyTasks.length > 0) {
+            console.log(`[Sync] Pushing ${localOnlyTasks.length} local-only task(s) to Supabase:`,
+              localOnlyTasks.map((t) => t.title));
+            for (const t of localOnlyTasks) {
               this.upsertTask(t).catch(() => {});
             }
           }
+
+          // Final state = Supabase tasks (authoritative) + local-only items
+          finalTasks = [...localOnlyTasks, ...remoteTasks];
         } else if (localData.tasks.length > 0) {
+          // Supabase is completely empty — push everything from local (initial setup)
+          console.log(`[Sync] Supabase empty, pushing ${localData.tasks.length} local tasks on initial setup.`);
           await this.upsertTasks(localData.tasks);
+          finalTasks = localData.tasks;
         } else {
           finalTasks = [];
         }

@@ -36,34 +36,48 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({ activiti
           <div className="py-8 text-center text-xs text-slate-400">No activity recorded yet</div>
         ) : (
           recent.map((act) => {
-            const timeFormatted = new Date(act.timestamp).toLocaleDateString([], {
-              month: 'short',
-              day: 'numeric',
-            });
-            const hourFormatted = new Date(act.timestamp).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
+            let timeFormatted = '';
+            let hourFormatted = '';
+            try {
+              if (act.timestamp) {
+                const d = new Date(act.timestamp);
+                if (!isNaN(d.getTime())) {
+                  timeFormatted = d.toLocaleDateString([], {
+                    month: 'short',
+                    day: 'numeric',
+                  });
+                  hourFormatted = d.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                }
+              }
+            } catch {}
+
+            const userInitials = act.userName
+              ? act.userName
+                  .split(' ')
+                  .filter(Boolean)
+                  .map((s) => s[0])
+                  .join('')
+                  .slice(0, 2)
+              : '--';
 
             return (
               <div
                 key={act.id}
-                onClick={() => openTaskDetail(act.taskId)}
+                onClick={() => act.taskId && openTaskDetail(act.taskId)}
                 className="py-2.5 px-2 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors group flex items-start gap-3"
               >
                 <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center shrink-0 border border-slate-200 group-hover:bg-blue-100 group-hover:text-blue-800 transition-colors">
-                  {act.userName
-                    .split(' ')
-                    .map((s) => s[0])
-                    .join('')
-                    .slice(0, 2)}
+                  {userInitials}
                 </div>
 
                 <div className="flex-1 min-w-0 text-xs">
                   <div className="flex items-baseline justify-between gap-1">
                     <p className="font-semibold text-slate-900 truncate">
-                      <span className="font-bold">{act.userName}</span>
-                      <span className="text-slate-400 font-normal"> ({act.userRole})</span>
+                      <span className="font-bold">{act.userName || 'System'}</span>
+                      {act.userRole && <span className="text-slate-400 font-normal"> ({act.userRole})</span>}
                     </p>
                     <span className="text-[10px] text-slate-400 shrink-0">
                       {timeFormatted} {hourFormatted}

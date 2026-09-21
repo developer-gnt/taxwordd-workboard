@@ -73,6 +73,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   const ownerInitials = task.assignedEmployeeName
     ? task.assignedEmployeeName
         .split(' ')
+        .filter(Boolean)
         .map((s) => s[0])
         .join('')
         .slice(0, 2)
@@ -153,8 +154,8 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
               <span className="text-[10px] uppercase font-semibold text-slate-400">Due Date</span>
               <div className="flex items-center gap-1.5 mt-1">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span className={`font-bold ${isOverdue ? 'text-rose-600' : 'text-slate-900'}`}>
-                  {task.dueDate || 'No due date'}
+                <span className={`font-bold ${isOverdue ? 'text-rose-600' : task.dueDate ? 'text-slate-900' : 'text-slate-400 font-normal italic'}`}>
+                  {task.dueDate || 'No deadline specified'}
                 </span>
                 {isOverdue && (
                   <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-rose-100 text-rose-700 uppercase">

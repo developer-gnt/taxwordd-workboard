@@ -40,8 +40,7 @@ class ProjectService {
       updatedAt: new Date().toISOString(),
     };
 
-    projects.push(newProject);
-    storageService.setProjects(projects);
+    await storageService.saveProject(newProject);
 
     return { success: true, message: `Project "${newProject.projectName}" created successfully.`, project: newProject };
   }
@@ -66,26 +65,32 @@ class ProjectService {
     };
 
     projects[index] = updated;
-    storageService.setProjects(projects);
+    // Supabase-first: persist project update directly to cloud
+    await storageService.saveProject(updated);
 
     // If projectName or clientName changed, update associated tasks for denormalized consistency
     if (updates.projectName || updates.clientName) {
       const tasks = storageService.getTasks();
-      let tasksChanged = false;
+      const tasksToSync: any[] = [];
       const syncedTasks = tasks.map((t) => {
         if (t.projectId === id) {
-          tasksChanged = true;
-          return {
+          const updated = {
             ...t,
             projectName: updates.projectName || t.projectName,
             clientName: updates.clientName || t.clientName,
             updatedAt: new Date().toISOString(),
           };
+          tasksToSync.push(updated);
+          return updated;
         }
         return t;
       });
-      if (tasksChanged) {
-        storageService.setTasks(syncedTasks);
+      if (tasksToSync.length > 0) {
+        // Supabase-first: push each changed task individually
+        for (const t of tasksToSync) {
+          storageService.saveTask(t).catch(() => {});
+        }
+        storageService.setTasks(syncedTasks, false); // update localStorage cache only
       }
     }
 

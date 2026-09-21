@@ -439,7 +439,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   project_id TEXT REFERENCES public.projects(id),
   assigned_employee_id TEXT REFERENCES public.users(id),
   priority TEXT NOT NULL DEFAULT 'MEDIUM',
-  due_date DATE NOT NULL,
+  due_date DATE,
   status TEXT NOT NULL DEFAULT 'NOT_STARTED',
   next_action TEXT NOT NULL
 );`}</pre>

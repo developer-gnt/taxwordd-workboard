@@ -18,16 +18,20 @@ import {
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
-  const { tasks, users, projects, activities, navigateTo } = useApp();
+  const { tasks = [], users = [], projects = [], activities = [], navigateTo } = useApp();
+  const safeTasks = tasks || [];
+  const safeUsers = users || [];
+  const safeProjects = projects || [];
+  const safeActivities = activities || [];
   const todayStr = getLocalDateString();
 
   // Derived counts
-  const totalTasks = tasks.length;
-  const activeTasks = tasks.filter((t) => t.status !== 'DONE').length;
-  const dueTodayTasks = tasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
-  const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;
-  const blockedTasks = tasks.filter((t) => t.status === 'BLOCKED').length;
-  const completedTasks = tasks.filter((t) => t.status === 'DONE').length;
+  const totalTasks = safeTasks.length;
+  const activeTasks = safeTasks.filter((t) => t.status !== 'DONE').length;
+  const dueTodayTasks = safeTasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
+  const overdueTasks = safeTasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;
+  const blockedTasks = safeTasks.filter((t) => t.status === 'BLOCKED').length;
+  const completedTasks = safeTasks.filter((t) => t.status === 'DONE').length;
 
   return (
     <div id="admin-dashboard-view" className="space-y-6">
@@ -99,20 +103,20 @@ export const AdminDashboard: React.FC = () => {
 
       {/* 2. Middle Row: Velocity Chart & Urgent Attention Bento Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <CompletionTrendCard tasks={tasks} />
-        <TasksAttentionCard tasks={tasks} />
+        <CompletionTrendCard tasks={safeTasks} />
+        <TasksAttentionCard tasks={safeTasks} />
       </div>
 
       {/* 3. Bottom Row: Workload & Project Delivery & Audit Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-1">
-          <WorkloadCard users={users} tasks={tasks} />
+          <WorkloadCard users={safeUsers} tasks={safeTasks} />
         </div>
         <div className="lg:col-span-1">
-          <ProjectProgressCard projects={projects} tasks={tasks} />
+          <ProjectProgressCard projects={safeProjects} tasks={safeTasks} />
         </div>
         <div className="lg:col-span-1">
-          <RecentActivityCard activities={activities} />
+          <RecentActivityCard activities={safeActivities} />
         </div>
       </div>
     </div>

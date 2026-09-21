@@ -21,7 +21,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ isOpen, onClos
   const [projectInput, setProjectInput] = useState('');
   const [assignedEmployeeId, setAssignedEmployeeId] = useState('');
   const [priority, setPriority] = useState<TaskPriority | ''>('MEDIUM');
-  const [dueDate, setDueDate] = useState<string>(() => getLocalDateString());
+  const [dueDate, setDueDate] = useState<string>('');
   const [nextAction, setNextAction] = useState('');
   const [notes, setNotes] = useState('');
   const [referenceLink, setReferenceLink] = useState('');
@@ -30,12 +30,9 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ isOpen, onClos
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Automatically ensure due date and priority default values whenever modal opens
+  // Automatically ensure priority default value whenever modal opens
   React.useEffect(() => {
     if (isOpen) {
-      if (!dueDate) {
-        setDueDate(getLocalDateString());
-      }
       if (!priority) {
         setPriority('MEDIUM');
       }
@@ -90,7 +87,7 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ isOpen, onClos
       setProjectInput('');
       setAssignedEmployeeId('');
       setPriority('MEDIUM');
-      setDueDate(getLocalDateString());
+      setDueDate('');
       setNextAction('');
       setNotes('');
       setReferenceLink('');
@@ -206,17 +203,52 @@ export const TaskCreateModal: React.FC<TaskCreateModalProps> = ({ isOpen, onClos
             </div>
 
             <div>
-              <label htmlFor="task-due-date-input" className="block font-bold text-slate-700 mb-1">
-                Due Date Deadline <span className="text-slate-400 font-normal text-xs">(Optional)</span>
-              </label>
-              <input
-                id="task-due-date-input"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs bg-white"
-              >
-              </input>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="task-due-date-input" className="font-bold text-slate-700">
+                  Due Date Deadline <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                </label>
+                {dueDate && (
+                  <button
+                    type="button"
+                    onClick={() => setDueDate('')}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold"
+                  >
+                    Clear Date
+                  </button>
+                )}
+              </div>
+              <div className="relative flex items-center">
+                <input
+                  id="task-due-date-input"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs bg-white"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => setDueDate(getLocalDateString())}
+                  className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  Set Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    setDueDate(getLocalDateString(d));
+                  }}
+                  className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  Tomorrow
+                </button>
+                {!dueDate && (
+                  <span className="text-[10px] text-slate-400 italic ml-auto">No deadline set</span>
+                )}
+              </div>
             </div>
           </div>
 

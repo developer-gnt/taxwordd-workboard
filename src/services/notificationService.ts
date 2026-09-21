@@ -1,5 +1,6 @@
 import type { Notification } from '../types';
 import { storageService } from './storageService';
+import { supabaseDb } from './supabaseDb';
 import { getLocalDateString } from '../utils/dateUtils';
 import { generateId } from '../utils/idUtils';
 
@@ -25,20 +26,26 @@ class NotificationService {
     if (target && !target.read) {
       target.read = true;
       storageService.setNotifications(list);
+      // Supabase: persist read status directly
+      supabaseDb.upsertNotification(target).catch(() => {});
     }
   }
 
   public async markAllAsRead(userId: string): Promise<void> {
     const list = storageService.getNotifications();
     let changed = false;
+    const toSync: Notification[] = [];
     list.forEach((n) => {
       if (n.userId === userId && !n.read) {
         n.read = true;
         changed = true;
+        toSync.push(n);
       }
     });
     if (changed) {
       storageService.setNotifications(list);
+      // Supabase: persist all read-status changes
+      supabaseDb.upsertNotifications(toSync).catch(() => {});
     }
   }
 
@@ -71,7 +78,8 @@ class NotificationService {
     }
     const filtered = list.filter((n) => n.id !== notificationId);
     if (filtered.length !== list.length) {
-      storageService.setNotifications(filtered);
+      storageService.setNotifications(filtered, false);
+      supabaseDb.deleteNotification(notificationId).catch(() => {});
     }
   }
 
@@ -92,7 +100,8 @@ class NotificationService {
     });
 
     if (filtered.length !== list.length) {
-      storageService.setNotifications(filtered);
+      storageService.setNotifications(filtered, false);
+      supabaseDb.deleteNotificationsForUser(userId, readOnly).catch(() => {});
     }
   }
 

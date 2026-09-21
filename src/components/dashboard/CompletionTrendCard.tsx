@@ -29,7 +29,7 @@ export const CompletionTrendCard: React.FC<CompletionTrendCardProps> = ({ tasks 
   ];
 
   const trendData = weeks.map((w) => {
-    const dueInWeek = tasks.filter((t) => t.dueDate >= w.start && t.dueDate <= w.end);
+    const dueInWeek = tasks.filter((t) => t.dueDate && t.dueDate >= w.start && t.dueDate <= w.end);
     const completed = dueInWeek.filter((t) => t.status === 'DONE').length;
     const total = dueInWeek.length;
     const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -55,6 +55,7 @@ export const CompletionTrendCard: React.FC<CompletionTrendCardProps> = ({ tasks 
   // On-time delivery rate among completed
   const onTimeDone = tasks.filter((t) => {
     if (t.status !== 'DONE') return false;
+    if (!t.dueDate) return true;
     const comp = t.completedAt ? t.completedAt.split('T')[0] : t.dueDate;
     return comp <= t.dueDate;
   }).length;

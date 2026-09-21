@@ -120,7 +120,7 @@ export const EmployeeUpdateModal: React.FC<EmployeeUpdateModalProps> = ({
             </div>
             <div className="text-right">
               <span className="text-[10px] uppercase font-semibold text-slate-400">Deadline</span>
-              <p className="font-bold text-slate-900">{task.dueDate}</p>
+              <p className="font-bold text-slate-900">{task.dueDate || 'No deadline'}</p>
             </div>
           </div>
 
@@ -243,7 +243,7 @@ export const EmployeeUpdateModal: React.FC<EmployeeUpdateModalProps> = ({
               onChange={(e) => setExpectedCompletionDate(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs bg-white"
             />
-            {expectedCompletionDate > task.dueDate && (
+            {task.dueDate && expectedCompletionDate && expectedCompletionDate > task.dueDate && (
               <p className="text-[11px] text-amber-600 mt-1 font-medium">
                 Note: Expected completion is past the original deadline ({task.dueDate}).
               </p>

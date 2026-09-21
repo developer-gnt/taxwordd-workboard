@@ -57,13 +57,13 @@ class TaskService {
     if (filter.quickFilter) {
       switch (filter.quickFilter) {
         case 'today':
-          tasks = tasks.filter((t) => t.dueDate === todayStr && t.status !== 'DONE');
+          tasks = tasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE');
           break;
         case 'overdue':
-          tasks = tasks.filter((t) => t.dueDate < todayStr && t.status !== 'DONE');
+          tasks = tasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE');
           break;
         case 'upcoming':
-          tasks = tasks.filter((t) => t.dueDate > todayStr && t.status !== 'DONE');
+          tasks = tasks.filter((t) => t.dueDate && t.dueDate > todayStr && t.status !== 'DONE');
           break;
         case 'blocked':
           tasks = tasks.filter((t) => t.status === 'BLOCKED');
@@ -79,11 +79,13 @@ class TaskService {
     return tasks.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
-  public async getTaskById(id: string): Promise<Task | null> {
+  // Get single task by ID
+  public async getTaskById(taskId: string): Promise<Task | null> {
     const tasks = storageService.getTasks();
-    return tasks.find((t) => t.id === id) || null;
+    return tasks.find((t) => t.id === taskId) || null;
   }
 
+  // Create new task (Admin & Manager role check)
   public async createTask(
     data: {
       title: string;
@@ -102,16 +104,19 @@ class TaskService {
     actor: User
   ): Promise<{ success: boolean; message: string; task?: Task }> {
     if (!authService.canCreateTask(actor)) {
-      return { success: false, message: 'Unauthorized: Only Admins and Managers can create and assign tasks.' };
+      return { success: false, message: 'Unauthorized: Only Admins and Managers can create tasks.' };
     }
 
-    // Validation
-    if (!data.title.trim()) return { success: false, message: 'Task title is required.' };
-    if (!data.projectId) return { success: false, message: 'Project assignment is required.' };
-    if (!data.priority) return { success: false, message: 'Priority level is required.' };
+    if (!data.title?.trim()) {
+      return { success: false, message: 'Task title is required.' };
+    }
+
+    if (!data.projectId?.trim()) {
+      return { success: false, message: 'Project selection is required.' };
+    }
 
     const projects = storageService.getProjects();
-    const cleanProjectInput = (data.projectId || '').trim();
+    const cleanProjectInput = data.projectId.trim();
     let project = projects.find((p) => p.id === cleanProjectInput);
     if (!project) {
       project = projects.find(
@@ -141,7 +146,22 @@ class TaskService {
     }
 
     const users = storageService.getUsers();
-    const assignedUser = data.assignedEmployeeId ? users.find((u) => u.id === data.assignedEmployeeId) : undefined;
+    let assignedUser: User | undefined = undefined;
+    if (data.assignedEmployeeId && data.assignedEmployeeId.trim()) {
+      const cleanAssigneeInput = data.assignedEmployeeId.trim();
+      assignedUser = users.find(
+        (u) =>
+          u.id === cleanAssigneeInput ||
+          u.email.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
+          u.name.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
+          cleanAssigneeInput.toLowerCase().startsWith(u.name.toLowerCase())
+      );
+    }
+
+    const cleanDueDate = data.dueDate && data.dueDate.trim() ? data.dueDate.trim() : '';
+    const cleanExpected = data.expectedCompletionDate && data.expectedCompletionDate.trim()
+      ? data.expectedCompletionDate.trim()
+      : (cleanDueDate || undefined);
 
     const newTask: Task = {
       id: `task-${Date.now()}`,
@@ -150,25 +170,25 @@ class TaskService {
       projectId: project.id,
       projectName: project.projectName,
       clientName: project.clientName,
-      assignedEmployeeId: assignedUser?.id || '',
+      assignedEmployeeId: assignedUser?.id || data.assignedEmployeeId?.trim() || '',
       assignedEmployeeName: assignedUser?.name || 'Unassigned',
       createdById: actor.id,
       createdByName: actor.name,
       priority: data.priority,
-      dueDate: data.dueDate?.trim() || getLocalDateString(),
+      dueDate: cleanDueDate,
       status: 'NOT_STARTED',
       progress: 0,
       nextAction: data.nextAction?.trim() || '',
       notes: data.notes?.trim() || '',
       referenceLink: data.referenceLink?.trim() || '',
       estimatedEffort: data.estimatedEffort?.trim() || '',
-      expectedCompletionDate: data.expectedCompletionDate || data.dueDate?.trim() || getLocalDateString(),
+      expectedCompletionDate: cleanExpected,
       attachments: data.attachments || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    storageService.saveTask(newTask);
+    await storageService.saveTask(newTask);
 
     // Record activity
     await activityService.recordActivity({
@@ -246,7 +266,7 @@ class TaskService {
         completedBy = actor.name;
       }
       const todayStr = getLocalDateString();
-      if (currentTask.dueDate < todayStr) {
+      if (currentTask.dueDate && currentTask.dueDate < todayStr) {
         wasOverdue = true;
       }
     } else if (currentTask.status === 'DONE') {
@@ -286,28 +306,48 @@ class TaskService {
         newValue: updates.status,
       });
 
-      // If blocked, notify creator/manager
-      if (updates.status === 'BLOCKED') {
-        await notificationService.createNotification({
-          userId: updatedTask.createdById,
-          type: 'BLOCKED',
-          title: 'Task Blocked Alert',
-          message: `${actor.name} marked "${updatedTask.title}" as Blocked: ${updatedTask.blocker}`,
-          taskId: updatedTask.id,
-          read: false,
-        });
-      }
+      // Notify ALL admins and managers of every status change
+      const allUsers = storageService.getUsers();
+      const adminsAndManagers = allUsers.filter((u) => u.role === 'ADMIN' || u.role === 'MANAGER');
 
-      // If submitted for review, notify creator
-      if (updates.status === 'REVIEW') {
-        await notificationService.createNotification({
-          userId: updatedTask.createdById,
-          type: 'RETURNED_FOR_REVIEW',
-          title: 'Task Ready for Review',
-          message: `${actor.name} submitted "${updatedTask.title}" for review.`,
-          taskId: updatedTask.id,
-          read: false,
-        });
+      for (const recipient of adminsAndManagers) {
+        if (updates.status === 'DONE') {
+          await notificationService.createNotification({
+            userId: recipient.id,
+            type: 'COMPLETED',
+            title: '✅ Task Completed',
+            message: `${actor.name} completed "${updatedTask.title}" (${updatedTask.projectName}).`,
+            taskId: updatedTask.id,
+            read: false,
+          });
+        } else if (updates.status === 'BLOCKED') {
+          await notificationService.createNotification({
+            userId: recipient.id,
+            type: 'BLOCKED',
+            title: '🚨 Task Blocked',
+            message: `${actor.name} blocked "${updatedTask.title}": ${updatedTask.blocker}`,
+            taskId: updatedTask.id,
+            read: false,
+          });
+        } else if (updates.status === 'REVIEW') {
+          await notificationService.createNotification({
+            userId: recipient.id,
+            type: 'RETURNED_FOR_REVIEW',
+            title: '👀 Task Submitted for Review',
+            message: `${actor.name} submitted "${updatedTask.title}" for your review.`,
+            taskId: updatedTask.id,
+            read: false,
+          });
+        } else {
+          await notificationService.createNotification({
+            userId: recipient.id,
+            type: 'STATUS_CHANGE',
+            title: '🔄 Task Status Updated',
+            message: `${actor.name} updated "${updatedTask.title}" → ${updates.status!.replace('_', ' ')} (${updatedTask.projectName}).`,
+            taskId: updatedTask.id,
+            read: false,
+          });
+        }
       }
     }
 
@@ -361,15 +401,24 @@ class TaskService {
     let newAssigneeName = currentTask.assignedEmployeeName;
 
     if (isReassigned) {
-      if (updates.assignedEmployeeId) {
+      if (updates.assignedEmployeeId && updates.assignedEmployeeId.trim()) {
         const users = storageService.getUsers();
-        const newAssignee = users.find((u) => u.id === updates.assignedEmployeeId);
-        if (!newAssignee || !newAssignee.active) {
+        const cleanAssigneeInput = updates.assignedEmployeeId.trim();
+        const newAssignee = users.find(
+          (u) =>
+            u.id === cleanAssigneeInput ||
+            u.email.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
+            u.name.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
+            cleanAssigneeInput.toLowerCase().startsWith(u.name.toLowerCase())
+        );
+        if (newAssignee && !newAssignee.active) {
           return { success: false, message: 'Cannot assign task to an inactive user.' };
         }
-        newAssigneeName = newAssignee.name;
+        newAssigneeName = newAssignee?.name || 'Unassigned';
+        updates.assignedEmployeeId = newAssignee?.id || cleanAssigneeInput;
       } else {
-        newAssigneeName = undefined;
+        newAssigneeName = 'Unassigned';
+        updates.assignedEmployeeId = '';
       }
     }
 
@@ -416,8 +465,8 @@ class TaskService {
         completedBy = actor.name;
       }
       const todayStr = getLocalDateString();
-      const targetDueDate = updates.dueDate || currentTask.dueDate;
-      if (targetDueDate < todayStr) {
+      const targetDueDate = updates.dueDate !== undefined ? updates.dueDate : currentTask.dueDate;
+      if (targetDueDate && targetDueDate < todayStr) {
         wasOverdue = true;
       }
     } else if (currentTask.status === 'DONE') {
@@ -426,9 +475,12 @@ class TaskService {
       wasOverdue = undefined;
     }
 
+    const updatedDueDate = updates.dueDate !== undefined ? (updates.dueDate.trim() || '') : currentTask.dueDate;
+
     const updatedTask: Task = {
       ...currentTask,
       ...updates,
+      dueDate: updatedDueDate,
       projectName: newProjectName,
       clientName: newClientName,
       assignedEmployeeName: newAssigneeName,

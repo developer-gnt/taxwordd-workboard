@@ -1,10 +1,16 @@
-import { Task, TaskStatus, TaskPriority, User, TaskAttachment } from '../types';
+import { Task, TaskStatus, TaskPriority, User, TaskAttachment, QuickFilterType } from '../types';
 import { storageService } from './storageService';
 import { authService } from './authService';
 import { activityService } from './activityService';
 import { notificationService } from './notificationService';
 import { getLocalDateString } from '../utils/dateUtils';
 import { generateId } from '../utils/idUtils';
+import {
+  findUserByIdentifier,
+  normalizeTasks,
+  normalizeTaskAssignment,
+  isTaskAssignedToUser,
+} from '../utils/identityUtils';
 
 export interface TaskFilterOptions {
   search?: string;
@@ -12,12 +18,13 @@ export interface TaskFilterOptions {
   priority?: TaskPriority | 'ALL';
   employeeId?: string;
   projectId?: string;
-  quickFilter?: 'all' | 'today' | 'upcoming' | 'overdue' | 'blocked' | 'completed';
+  quickFilter?: QuickFilterType;
 }
 
 class TaskService {
   public async getTasks(filter?: TaskFilterOptions): Promise<Task[]> {
-    let tasks = storageService.getTasks();
+    const users = storageService.getUsers();
+    let tasks = normalizeTasks(storageService.getTasks(), users);
     const todayStr = getLocalDateString();
 
     if (!filter) {
@@ -47,7 +54,12 @@ class TaskService {
     }
 
     if (filter.employeeId) {
-      tasks = tasks.filter((t) => t.assignedEmployeeId === filter.employeeId);
+      const targetUser = users.find((u) => u.id === filter.employeeId) || findUserByIdentifier(users, filter.employeeId);
+      if (targetUser) {
+        tasks = tasks.filter((t) => isTaskAssignedToUser(t, targetUser));
+      } else {
+        tasks = tasks.filter((t) => t.assignedEmployeeId === filter.employeeId);
+      }
     }
 
     if (filter.projectId) {
@@ -56,6 +68,9 @@ class TaskService {
 
     if (filter.quickFilter) {
       switch (filter.quickFilter) {
+        case 'active':
+          tasks = tasks.filter((t) => t.status !== 'DONE' && (t.progress ?? 0) < 100);
+          break;
         case 'today':
           tasks = tasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE');
           break;
@@ -81,8 +96,10 @@ class TaskService {
 
   // Get single task by ID
   public async getTaskById(taskId: string): Promise<Task | null> {
+    const users = storageService.getUsers();
     const tasks = storageService.getTasks();
-    return tasks.find((t) => t.id === taskId) || null;
+    const task = tasks.find((t) => t.id === taskId) || null;
+    return task ? normalizeTaskAssignment(task, users) : null;
   }
 
   // Create new task (Admin & Manager role check)
@@ -149,13 +166,7 @@ class TaskService {
     let assignedUser: User | undefined = undefined;
     if (data.assignedEmployeeId && data.assignedEmployeeId.trim()) {
       const cleanAssigneeInput = data.assignedEmployeeId.trim();
-      assignedUser = users.find(
-        (u) =>
-          u.id === cleanAssigneeInput ||
-          u.email.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
-          u.name.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
-          cleanAssigneeInput.toLowerCase().startsWith(u.name.toLowerCase())
-      );
+      assignedUser = findUserByIdentifier(users, cleanAssigneeInput);
     }
 
     const cleanDueDate = data.dueDate && data.dueDate.trim() ? data.dueDate.trim() : '';
@@ -163,7 +174,7 @@ class TaskService {
       ? data.expectedCompletionDate.trim()
       : (cleanDueDate || undefined);
 
-    const newTask: Task = {
+    let newTask: Task = {
       id: `task-${Date.now()}`,
       title: data.title.trim(),
       description: data.description?.trim() || '',
@@ -188,7 +199,41 @@ class TaskService {
       updatedAt: new Date().toISOString(),
     };
 
-    await storageService.saveTask(newTask);
+    newTask = normalizeTaskAssignment(newTask, users);
+
+    if (assignedUser) {
+      await storageService.saveUser(assignedUser);
+    }
+    if (actor) {
+      await storageService.saveUser(actor);
+    }
+
+    console.log('[createTask] FINAL TASK PAYLOAD', {
+      id: newTask.id,
+      title: newTask.title,
+      projectId: newTask.projectId,
+      assignedEmployeeId: newTask.assignedEmployeeId,
+      assignedEmployeeName: newTask.assignedEmployeeName,
+      createdById: newTask.createdById,
+      createdByName: newTask.createdByName,
+    });
+
+    const taskSaved = await storageService.saveTask(newTask);
+
+    if (!taskSaved) {
+      console.error('[createTask] Task persistence failed', {
+        taskId: newTask.id,
+        title: newTask.title,
+        assignedEmployeeId: newTask.assignedEmployeeId,
+        projectId: newTask.projectId,
+        createdById: newTask.createdById,
+      });
+
+      return {
+        success: false,
+        message: 'Task could not be saved to the database. No notification was sent.',
+      };
+    }
 
     // Record activity
     await activityService.recordActivity({
@@ -201,7 +246,7 @@ class TaskService {
       newValue: assignedUser?.name || 'Unassigned',
     });
 
-    // Notify assigned employee if assigned
+    // Notify assigned employee only AFTER successful task persistence
     if (assignedUser) {
       await notificationService.createNotification({
         userId: assignedUser.id,
@@ -290,8 +335,11 @@ class TaskService {
       updatedAt: new Date().toISOString(),
     };
 
-    tasks[taskIndex] = updatedTask;
-    await storageService.saveTask(updatedTask);
+    const saved = await storageService.saveTask(updatedTask);
+    if (!saved) {
+      console.error('[employeeUpdateTask] Failed to persist task update in Supabase', { taskId: updatedTask.id });
+      return { success: false, message: 'Failed to persist task update to the database.' };
+    }
 
     // Record specific activities
     if (updates.status && updates.status !== currentTask.status) {
@@ -404,13 +452,7 @@ class TaskService {
       if (updates.assignedEmployeeId && updates.assignedEmployeeId.trim()) {
         const users = storageService.getUsers();
         const cleanAssigneeInput = updates.assignedEmployeeId.trim();
-        const newAssignee = users.find(
-          (u) =>
-            u.id === cleanAssigneeInput ||
-            u.email.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
-            u.name.toLowerCase() === cleanAssigneeInput.toLowerCase() ||
-            cleanAssigneeInput.toLowerCase().startsWith(u.name.toLowerCase())
-        );
+        const newAssignee = findUserByIdentifier(users, cleanAssigneeInput);
         if (newAssignee && !newAssignee.active) {
           return { success: false, message: 'Cannot assign task to an inactive user.' };
         }
@@ -477,7 +519,8 @@ class TaskService {
 
     const updatedDueDate = updates.dueDate !== undefined ? (updates.dueDate.trim() || '') : currentTask.dueDate;
 
-    const updatedTask: Task = {
+    const users = storageService.getUsers();
+    let updatedTask: Task = {
       ...currentTask,
       ...updates,
       dueDate: updatedDueDate,
@@ -493,8 +536,12 @@ class TaskService {
       updatedAt: new Date().toISOString(),
     };
 
-    tasks[taskIndex] = updatedTask;
-    await storageService.saveTask(updatedTask);
+    updatedTask = normalizeTaskAssignment(updatedTask, users);
+    const saved = await storageService.saveTask(updatedTask);
+    if (!saved) {
+      console.error('[updateTaskMetadata] Failed to persist task update in Supabase', { taskId: updatedTask.id });
+      return { success: false, message: 'Failed to persist task metadata updates to the database.' };
+    }
 
     // Track activity for reassignment
     if (isReassigned) {

@@ -1,6 +1,95 @@
 import { supabase } from './supabaseClient';
 import { User, Project, Task, TaskActivity, Notification } from '../types';
 
+// ==================== ROW MAPPERS FOR REALTIME & QUERIES ====================
+export function mapUserRowToUser(row: any): User {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    pin: row.pin,
+    active: row.active ?? true,
+    avatar: row.avatar || undefined,
+    initials: row.initials,
+    department: row.department || 'Operations',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapProjectRowToProject(row: any): Project {
+  return {
+    id: row.id,
+    projectName: row.project_name,
+    clientName: row.client_name,
+    status: row.status,
+    description: row.description || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapTaskRowToTask(row: any): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description || '',
+    projectId: row.project_id || '',
+    projectName: row.project_name || '',
+    clientName: row.client_name || '',
+    assignedEmployeeId: row.assigned_employee_id || '',
+    assignedEmployeeName: row.assigned_employee_name || 'Unassigned',
+    createdById: row.created_by_id || '',
+    createdByName: row.created_by_name || 'Admin',
+    priority: row.priority,
+    dueDate: row.due_date || '',
+    status: row.status,
+    progress: row.progress ?? 0,
+    blocker: row.blocker || undefined,
+    nextAction: row.next_action || '',
+    notes: row.notes || '',
+    referenceLink: row.reference_link || '',
+    estimatedEffort: row.estimated_effort || '',
+    expectedCompletionDate: row.expected_completion_date || undefined,
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    completedAt: row.completed_at || undefined,
+    completedBy: row.completed_by || undefined,
+    wasOverdue: row.was_overdue || false,
+    carriedForward: row.carried_forward || false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapNotificationRowToNotification(row: any): Notification {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    taskId: row.task_id || undefined,
+    read: row.read ?? false,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapActivityRowToActivity(row: any): TaskActivity {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    taskTitle: row.task_title || '',
+    userId: row.user_id || '',
+    userName: row.user_name,
+    userRole: row.user_role,
+    action: row.action,
+    previousValue: row.previous_value || undefined,
+    newValue: row.new_value || undefined,
+    timestamp: row.timestamp || row.created_at,
+  };
+}
+
 export class SupabaseDbService {
   private isSyncing = false;
 
@@ -13,19 +102,7 @@ export class SupabaseDbService {
         return null;
       }
       if (!data) return [];
-      return data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        role: row.role,
-        pin: row.pin,
-        active: row.active ?? true,
-        avatar: row.avatar || undefined,
-        initials: row.initials,
-        department: row.department || 'Operations',
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
+      return data.map(mapUserRowToUser);
     } catch (e) {
       console.warn('Supabase fetchUsers exception:', e);
       return null;
@@ -125,15 +202,7 @@ export class SupabaseDbService {
         return null;
       }
       if (!data) return [];
-      return data.map((row: any) => ({
-        id: row.id,
-        projectName: row.project_name,
-        clientName: row.client_name,
-        status: row.status,
-        description: row.description || '',
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
+      return data.map(mapProjectRowToProject);
     } catch (e) {
       console.warn('Supabase fetchProjects exception:', e);
       return null;
@@ -210,35 +279,7 @@ export class SupabaseDbService {
         return null;
       }
       if (!data) return [];
-      return data.map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        description: row.description || '',
-        projectId: row.project_id || '',
-        projectName: row.project_name || '',
-        clientName: row.client_name || '',
-        assignedEmployeeId: row.assigned_employee_id || '',
-        assignedEmployeeName: row.assigned_employee_name || 'Unassigned',
-        createdById: row.created_by_id || '',
-        createdByName: row.created_by_name || 'Admin',
-        priority: row.priority,
-        dueDate: row.due_date || '',
-        status: row.status,
-        progress: row.progress || 0,
-        blocker: row.blocker || undefined,
-        nextAction: row.next_action || '',
-        notes: row.notes || '',
-        referenceLink: row.reference_link || '',
-        estimatedEffort: row.estimated_effort || '',
-        expectedCompletionDate: row.expected_completion_date || undefined,
-        attachments: Array.isArray(row.attachments) ? row.attachments : [],
-        completedAt: row.completed_at || undefined,
-        completedBy: row.completed_by || undefined,
-        wasOverdue: row.was_overdue || false,
-        carriedForward: row.carried_forward || false,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }));
+      return data.map(mapTaskRowToTask);
     } catch (e) {
       console.warn('Supabase fetchTasks exception:', e);
       return null;
@@ -276,26 +317,40 @@ export class SupabaseDbService {
         created_at: task.createdAt || new Date().toISOString(),
         updated_at: task.updatedAt || new Date().toISOString(),
       };
-      const { error } = await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
-      if (error) {
-        // If FK violation (e.g. invalid user/project reference), nullify FK fields and retry
-        if (error.code === '23503' || error.message?.includes('foreign key')) {
-          payload.project_id = null;
-          payload.assigned_employee_id = null;
-          payload.created_by_id = null;
-          const retry = await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
-          if (retry.error) {
-            console.error('Supabase upsertTask retry error:', retry.error);
-            return false;
-          }
-          return true;
+
+      let currentPayload = { ...payload };
+      let { error } = await supabase.from('tasks').upsert(currentPayload, { onConflict: 'id' });
+
+      // If Postgres schema cache / missing column error (PGRST204), dynamically strip missing column and retry
+      while (error && error.code === 'PGRST204') {
+        const match = error.message?.match(/Could not find the '([^']+)' column/i);
+        const missingColumn = match ? match[1] : null;
+        if (missingColumn && missingColumn in currentPayload) {
+          console.warn(`[Supabase] Table 'tasks' missing optional column '${missingColumn}'. Retrying without it.`);
+          delete currentPayload[missingColumn];
+          const retryRes = await supabase.from('tasks').upsert(currentPayload, { onConflict: 'id' });
+          error = retryRes.error;
+        } else {
+          break;
         }
-        console.error('Supabase upsertTask error:', error);
+      }
+
+      if (error) {
+        console.error('[Supabase] upsertTask failed:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          taskId: task.id,
+          assignedEmployeeId: task.assignedEmployeeId,
+          projectId: task.projectId,
+          createdById: task.createdById,
+        });
         return false;
       }
       return true;
-    } catch (e) {
-      console.error('Supabase upsertTask exception:', e);
+    } catch (error) {
+      console.error('[Supabase] upsertTask exception:', error);
       return false;
     }
   }
@@ -383,18 +438,7 @@ export class SupabaseDbService {
         return null;
       }
       if (!data) return [];
-      return data.map((row: any) => ({
-        id: row.id,
-        taskId: row.task_id,
-        taskTitle: row.task_title || '',
-        userId: row.user_id || '',
-        userName: row.user_name,
-        userRole: row.user_role,
-        action: row.action,
-        previousValue: row.previous_value || undefined,
-        newValue: row.new_value || undefined,
-        timestamp: row.timestamp,
-      }));
+      return data.map(mapActivityRowToActivity);
     } catch (e) {
       console.warn('Supabase fetchActivities exception:', e);
       return null;
@@ -463,16 +507,7 @@ export class SupabaseDbService {
         return null;
       }
       if (!data) return [];
-      return data.map((row: any) => ({
-        id: row.id,
-        userId: row.user_id,
-        type: row.type,
-        title: row.title,
-        message: row.message,
-        taskId: row.task_id || undefined,
-        read: row.read || false,
-        createdAt: row.created_at,
-      }));
+      return data.map(mapNotificationRowToNotification);
     } catch (e) {
       console.warn('Supabase fetchNotifications exception:', e);
       return null;

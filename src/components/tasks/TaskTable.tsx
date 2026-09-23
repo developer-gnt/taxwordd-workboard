@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { StatusBadge, PriorityBadge } from '../ui/StatusBadge';
 import { EmptyState } from '../ui/EmptyState';
 import { getLocalDateString } from '../../utils/dateUtils';
+import { isTaskAssignedToUser, findUserByIdentifier } from '../../utils/identityUtils';
 import {
   Search,
   Filter,
@@ -102,7 +103,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       search: '',
       dueDate: '',
     });
-    showToast('Filters Cleared', 'Task view reset to all active deliverables', 'info');
+    showToast('Filters Cleared', 'Task view reset to all deliverables', 'info');
   };
 
   // Filter tasks based on current filter state
@@ -135,7 +136,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
 
     if (!isEmployeeView && taskFilterState.employeeId) {
-      if (t.assignedEmployeeId !== taskFilterState.employeeId) return false;
+      const targetUser = users.find((u) => u.id === taskFilterState.employeeId) || findUserByIdentifier(users, taskFilterState.employeeId);
+      if (targetUser) {
+        if (!isTaskAssignedToUser(t, targetUser)) return false;
+      } else if (t.assignedEmployeeId !== taskFilterState.employeeId) {
+        return false;
+      }
     }
 
     if (taskFilterState.projectId) {
@@ -143,8 +149,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
 
     const currentQuickFilter = taskFilterState.quickFilter || 'all';
-    if (currentQuickFilter === 'all') {
-      if (t.status === 'DONE' && taskFilterState.status !== 'DONE') {
+    if (currentQuickFilter === 'active') {
+      if (t.status === 'DONE' || (t.progress ?? 0) >= 100) {
         return false;
       }
     } else if (currentQuickFilter === 'today') {
@@ -187,7 +193,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         t.nextAction.toLowerCase().includes(q);
       if (!match) return false;
     }
-    if (!isEmployeeView && taskFilterState.employeeId && t.assignedEmployeeId !== taskFilterState.employeeId) return false;
+    if (!isEmployeeView && taskFilterState.employeeId) {
+      const targetUser = users.find((u) => u.id === taskFilterState.employeeId) || findUserByIdentifier(users, taskFilterState.employeeId);
+      if (targetUser) {
+        if (!isTaskAssignedToUser(t, targetUser)) return false;
+      } else if (t.assignedEmployeeId !== taskFilterState.employeeId) {
+        return false;
+      }
+    }
     if (taskFilterState.projectId && t.projectId !== taskFilterState.projectId) return false;
     if (taskFilterState.priority && taskFilterState.priority !== 'ALL' && t.priority !== taskFilterState.priority) return false;
 
@@ -211,11 +224,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const quickFilterTabs = [
     {
       id: 'all',
-      label: 'All Tasks',
-      count:
-        taskFilterState.status && taskFilterState.status !== 'ALL'
-          ? contextFilteredTasks.length
-          : contextFilteredTasks.filter((t) => t.status !== 'DONE').length,
+      label: 'All',
+      count: contextFilteredTasks.length,
+    },
+    {
+      id: 'active',
+      label: 'Active',
+      count: tasks.filter(
+        (t) =>
+          matchesToolbarFilters(t, { ignoreStatus: true }) &&
+          t.status !== 'DONE' &&
+          (t.progress ?? 0) < 100
+      ).length,
     },
     {
       id: 'today',
@@ -225,9 +245,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           matchesToolbarFilters(t, { ignoreDueDate: true }) &&
           t.dueDate &&
           t.dueDate === todayStr &&
-          (taskFilterState.status && taskFilterState.status !== 'ALL'
-            ? t.status === taskFilterState.status
-            : t.status !== 'DONE')
+          t.status !== 'DONE'
       ).length,
     },
     {
@@ -238,9 +256,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           matchesToolbarFilters(t, { ignoreDueDate: true }) &&
           t.dueDate &&
           t.dueDate < todayStr &&
-          (taskFilterState.status && taskFilterState.status !== 'ALL'
-            ? t.status === taskFilterState.status
-            : t.status !== 'DONE')
+          t.status !== 'DONE'
       ).length,
     },
     {
@@ -252,7 +268,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     },
     {
       id: 'completed',
-      label: 'Completed',
+      label: 'Delivered',
       count: tasks.filter(
         (t) => matchesToolbarFilters(t, { ignoreStatus: true }) && t.status === 'DONE'
       ).length,

@@ -3,6 +3,7 @@ import { User, Task } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { Users, AlertCircle, ArrowRight } from 'lucide-react';
 import { getLocalDateString } from '../../utils/dateUtils';
+import { isTaskAssignedToUser } from '../../utils/identityUtils';
 
 interface WorkloadCardProps {
   users: User[];
@@ -18,7 +19,7 @@ export const WorkloadCard: React.FC<WorkloadCardProps> = ({ users, tasks }) => {
 
   const workloadStats = eligibleUsers
     .map((u) => {
-      const userTasks = tasks.filter((t) => t.assignedEmployeeId === u.id);
+      const userTasks = tasks.filter((t) => isTaskAssignedToUser(t, u));
       const active = userTasks.filter((t) => t.status !== 'DONE').length;
       const dueToday = userTasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
       const overdue = userTasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;

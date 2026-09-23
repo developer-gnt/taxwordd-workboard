@@ -142,18 +142,20 @@ class StorageService {
     try {
       syncedToCloud = await supabaseDb.upsertUser(user);
     } catch (e) {
-      console.warn('Supabase save user error (caching locally):', e);
+      console.error('[Storage] Supabase save user exception:', e);
     }
 
-    // CACHE: Update localStorage for instant reads
-    const users = this.getUsers();
-    const idx = users.findIndex((u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
-    if (idx >= 0) {
-      users[idx] = user;
-    } else {
-      users.push(user);
+    if (syncedToCloud) {
+      // CACHE: Update localStorage for instant reads
+      const users = this.getUsers();
+      const idx = users.findIndex((u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
+      if (idx >= 0) {
+        users[idx] = user;
+      } else {
+        users.push(user);
+      }
+      this.setItem(STORAGE_KEYS.USERS, users);
     }
-    this.setItem(STORAGE_KEYS.USERS, users);
     return syncedToCloud;
   }
 
@@ -189,18 +191,20 @@ class StorageService {
     try {
       syncedToCloud = await supabaseDb.upsertProject(project);
     } catch (e) {
-      console.warn('Supabase save project error (caching locally):', e);
+      console.error('[Storage] Supabase save project exception:', e);
     }
 
-    // CACHE: Update localStorage for instant reads
-    const projects = this.getProjects();
-    const idx = projects.findIndex((p) => p.id === project.id);
-    if (idx >= 0) {
-      projects[idx] = project;
-    } else {
-      projects.unshift(project);
+    if (syncedToCloud) {
+      // CACHE: Update localStorage for instant reads
+      const projects = this.getProjects();
+      const idx = projects.findIndex((p) => p.id === project.id);
+      if (idx >= 0) {
+        projects[idx] = project;
+      } else {
+        projects.unshift(project);
+      }
+      this.setItem(STORAGE_KEYS.PROJECTS, projects);
     }
-    this.setItem(STORAGE_KEYS.PROJECTS, projects);
     return syncedToCloud;
   }
 
@@ -236,10 +240,15 @@ class StorageService {
     try {
       syncedToCloud = await supabaseDb.upsertTask(task);
     } catch (e) {
-      console.warn('Supabase save task error (caching locally):', e);
+      console.error('[Storage] Supabase save task exception:', e);
     }
 
-    // CACHE: Update localStorage for instant UI reads
+    if (!syncedToCloud) {
+      console.error('[Storage] saveTask failed: Supabase rejected persistence for task', task.id);
+      return false;
+    }
+
+    // CACHE: Update localStorage for instant UI reads only after successful DB persistence
     const tasks = this.getTasks();
     const idx = tasks.findIndex((t) => t.id === task.id);
     if (idx >= 0) {
@@ -248,7 +257,7 @@ class StorageService {
       tasks.unshift(task);
     }
     this.setItem(STORAGE_KEYS.TASKS, tasks);
-    return syncedToCloud;
+    return true;
   }
 
   public async deleteTask(taskId: string): Promise<boolean> {

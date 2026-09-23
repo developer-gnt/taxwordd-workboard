@@ -9,6 +9,11 @@ import {
 } from '../types';
 import { storageService } from './storageService';
 import { getLocalDateString } from '../utils/dateUtils';
+import {
+  isTaskAssignedToUser,
+  findUserByIdentifier,
+  normalizeTasks,
+} from '../utils/identityUtils';
 
 export interface GeneratedMonthlyReport {
   filter: MonthlyReportFilter;
@@ -30,8 +35,8 @@ class ReportService {
   }
 
   public generateMonthlyReport(filter: MonthlyReportFilter): GeneratedMonthlyReport {
-    const allTasks = storageService.getTasks();
     const allUsers = storageService.getUsers();
+    const allTasks = normalizeTasks(storageService.getTasks(), allUsers);
     const allProjects = storageService.getProjects();
 
     const targetMonth = filter.month; // e.g. '2026-09'
@@ -45,15 +50,6 @@ class ReportService {
     const endDate = getLocalDateString(new Date(year, monthIndex + 1, 0));
 
     // Date-based task filtering for this month:
-    // A task belongs to this reporting window if:
-    // 1) Its dueDate falls in the target month, OR
-    // 2) It was completed in this month, OR
-    // 3) It was active during this month (created <= endDate and (not completed or completed >= startDate))
-    // Date-based task filtering for this month:
-    // A task belongs to this reporting window if:
-    // 1) Its dueDate falls in the target month, OR
-    // 2) It was completed in this month, OR
-    // 3) It was active during this month (created <= endDate and (not completed or completed >= startDate))
     let relevantTasks = allTasks.filter((t) => {
       const dueInMonth = t.dueDate ? (t.dueDate >= startDate && t.dueDate <= endDate) : false;
       const completedInMonth = t.completedAt ? this.isSameMonth(t.completedAt.split('T')[0], targetMonth) : false;
@@ -64,15 +60,12 @@ class ReportService {
 
     // Apply user filters
     if (filter.employeeId) {
-      const targetUser = allUsers.find((u) => u.id === filter.employeeId);
-      relevantTasks = relevantTasks.filter((t) => {
-        if (t.assignedEmployeeId === filter.employeeId) return true;
-        if (targetUser) {
-          if (targetUser.email && t.assignedEmployeeId?.toLowerCase() === targetUser.email.toLowerCase()) return true;
-          if (targetUser.name && t.assignedEmployeeName && t.assignedEmployeeName.toLowerCase().trim() === targetUser.name.toLowerCase().trim()) return true;
-        }
-        return false;
-      });
+      const targetUser = allUsers.find((u) => u.id === filter.employeeId) || findUserByIdentifier(allUsers, filter.employeeId);
+      if (targetUser) {
+        relevantTasks = relevantTasks.filter((t) => isTaskAssignedToUser(t, targetUser));
+      } else {
+        relevantTasks = relevantTasks.filter((t) => t.assignedEmployeeId === filter.employeeId);
+      }
     }
     if (filter.projectId) {
       relevantTasks = relevantTasks.filter((t) => t.projectId === filter.projectId);
@@ -152,12 +145,7 @@ class ReportService {
       : allUsers.filter((u) => u.role === 'EMPLOYEE' || u.role === 'MANAGER' || employeeIds.includes(u.id));
 
     const employeePerformance: EmployeePerformanceSummary[] = targetEmployees.map((emp) => {
-      const empTasks = relevantTasks.filter(
-        (t) =>
-          t.assignedEmployeeId === emp.id ||
-          (emp.email && t.assignedEmployeeId?.toLowerCase() === emp.email.toLowerCase()) ||
-          (t.assignedEmployeeName && t.assignedEmployeeName.toLowerCase().trim() === emp.name.toLowerCase().trim())
-      );
+      const empTasks = relevantTasks.filter((t) => isTaskAssignedToUser(t, emp));
       const assigned = empTasks.length;
       let completed = 0;
       let onTime = 0;

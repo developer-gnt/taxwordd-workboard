@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { TaskTable } from '../../components/tasks/TaskTable';
 import { Task } from '../../types';
 import { getLocalDateString } from '../../utils/dateUtils';
+import { isTaskAssignedToUser } from '../../utils/identityUtils';
 import {
   CheckSquare,
   Clock,
@@ -37,34 +38,23 @@ export const EmployeeTasksView: React.FC<EmployeeTasksViewProps> = ({
 
   if (!currentUser) return null;
 
-  // Filter tasks belonging strictly to current employee
-  const myTasks = tasks.filter((t) => {
-    const matchId = Boolean(
-      t.assignedEmployeeId &&
-      (t.assignedEmployeeId === currentUser.id ||
-        t.assignedEmployeeId.replace('usr-', 'user-') === currentUser.id.replace('usr-', 'user-'))
-    );
-    const matchEmail = Boolean(
-      currentUser.email &&
-      (t.assignedEmployeeId?.toLowerCase() === currentUser.email.toLowerCase() ||
-        t.assignedEmployeeName?.toLowerCase() === currentUser.email.toLowerCase())
-    );
-    const matchName = Boolean(
-      currentUser.name &&
-      t.assignedEmployeeName &&
-      t.assignedEmployeeName !== 'Unassigned' &&
-      (t.assignedEmployeeName.toLowerCase().trim() === currentUser.name.toLowerCase().trim() ||
-        t.assignedEmployeeName.toLowerCase().trim().includes(currentUser.name.toLowerCase().trim()) ||
-        currentUser.name.toLowerCase().trim().includes(t.assignedEmployeeName.toLowerCase().trim()))
-    );
-    return Boolean(matchId || matchEmail || matchName);
-  });
+  // Filter tasks belonging strictly to current employee with canonical identity matching
+  const myTasks = tasks.filter((t) => isTaskAssignedToUser(t, currentUser));
 
-  const activeCount = myTasks.filter((t) => t.status !== 'DONE').length;
+  const activeCount = myTasks.filter((t) => t.status !== 'DONE' && (t.progress ?? 0) < 100).length;
   const dueTodayCount = myTasks.filter((t) => t.dueDate && t.dueDate === todayStr && t.status !== 'DONE').length;
   const overdueCount = myTasks.filter((t) => t.dueDate && t.dueDate < todayStr && t.status !== 'DONE').length;
   const blockedCount = myTasks.filter((t) => t.status === 'BLOCKED').length;
   const completedCount = myTasks.filter((t) => t.status === 'DONE').length;
+
+  const handleKpiFilter = (quickFilter: 'all' | 'active' | 'today' | 'overdue' | 'blocked' | 'completed') => {
+    setTaskFilterState((prev: any) => ({
+      ...prev,
+      quickFilter,
+      dueDate: quickFilter === 'today' ? todayStr : '',
+      status: quickFilter === 'completed' ? 'DONE' : quickFilter === 'blocked' ? 'BLOCKED' : 'ALL',
+    }));
+  };
 
   return (
     <div id="employee-tasks-view" className="space-y-5">
@@ -95,32 +85,52 @@ export const EmployeeTasksView: React.FC<EmployeeTasksViewProps> = ({
         </div>
       </div>
 
-      {/* Quick KPI Stat Strip */}
+      {/* Quick KPI Stat Strip (Clickable tabs) */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => handleKpiFilter('all')}
+          className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-left hover:border-blue-400 transition-all cursor-pointer"
+        >
           <span className="text-[10px] uppercase font-bold text-slate-400">My Backlog</span>
           <p className="text-2xl font-extrabold text-slate-900 mt-1">{myTasks.length}</p>
-        </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => handleKpiFilter('active')}
+          className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-left hover:border-blue-400 transition-all cursor-pointer"
+        >
           <span className="text-[10px] uppercase font-bold text-blue-600">Active</span>
           <p className="text-2xl font-extrabold text-blue-700 mt-1">{activeCount}</p>
-        </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => handleKpiFilter('today')}
+          className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-left hover:border-amber-400 transition-all cursor-pointer"
+        >
           <span className="text-[10px] uppercase font-bold text-amber-700">Due Today</span>
           <p className="text-2xl font-extrabold text-amber-700 mt-1">{dueTodayCount}</p>
-        </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => handleKpiFilter('overdue')}
+          className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-left hover:border-rose-400 transition-all cursor-pointer"
+        >
           <span className="text-[10px] uppercase font-bold text-rose-600">Overdue</span>
           <p className="text-2xl font-extrabold text-rose-700 mt-1">{overdueCount}</p>
-        </div>
+        </button>
 
-        <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => handleKpiFilter('completed')}
+          className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-left hover:border-emerald-400 transition-all cursor-pointer"
+        >
           <span className="text-[10px] uppercase font-bold text-emerald-600">Delivered</span>
           <p className="text-2xl font-extrabold text-emerald-700 mt-1">{completedCount}</p>
-        </div>
+        </button>
       </div>
 
       {/* Interactive Task Table */}

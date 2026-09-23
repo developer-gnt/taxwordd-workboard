@@ -6,6 +6,8 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export type ProjectStatus = 'ACTIVE' | 'COMPLETED' | 'ON_HOLD' | 'ARCHIVED';
 
+export type QuickFilterType = 'all' | 'active' | 'today' | 'upcoming' | 'overdue' | 'blocked' | 'completed';
+
 export type NotificationType =
   | 'NEW_TASK_ASSIGNED'
   | 'DUE_TODAY'

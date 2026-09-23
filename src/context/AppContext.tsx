@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { User, Task, Project, TaskActivity, Notification, TaskStatus, TaskPriority, ProjectStatus, UserRole } from '../types';
+import { User, Task, Project, TaskActivity, Notification, TaskStatus, TaskPriority, ProjectStatus, UserRole, QuickFilterType } from '../types';
 import { formatLocalDateDisplay, getLocalDateString } from '../utils/dateUtils';
 import { storageService } from '../services/storageService';
 import { authService, LoginResult } from '../services/authService';
@@ -8,6 +8,18 @@ import { taskService } from '../services/taskService';
 import { userService } from '../services/userService';
 import { projectService } from '../services/projectService';
 import { notificationService } from '../services/notificationService';
+import {
+  mapUserRowToUser,
+  mapProjectRowToProject,
+  mapTaskRowToTask,
+  mapNotificationRowToNotification,
+  mapActivityRowToActivity,
+} from '../services/supabaseDb';
+import {
+  normalizeTaskAssignment,
+  mergeTaskWithTimestamp,
+  isTaskAssignedToUser,
+} from '../utils/identityUtils';
 
 export interface ToastMessage {
   id: string;
@@ -37,7 +49,7 @@ interface AppContextType {
     priority?: TaskPriority | 'ALL';
     employeeId?: string;
     projectId?: string;
-    quickFilter?: 'all' | 'today' | 'upcoming' | 'overdue' | 'blocked' | 'completed';
+    quickFilter?: QuickFilterType;
     search?: string;
     dueDate?: string;
   };
@@ -221,6 +233,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Tracks notification IDs already seen by the current user to detect new ones
   const prevNotifIdsRef = useRef<Set<string>>(new Set());
   const prevUserIdRef = useRef<string | null>(null);
+  const currentUserRef = useRef<User | null>(null);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   const updateRoute = useCallback((newRoute: string) => {
     setActiveRoute(newRoute);
@@ -247,6 +264,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivities(allActivities);
     setNotifications(allNotifs);
     setCurrentUser(curr);
+    currentUserRef.current = curr;
 
     // ── Live popup toast for new notifications ──────────────────────────────
     if (curr) {
@@ -334,22 +352,145 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     window.addEventListener('hashchange', handleHashChange);
 
-    // Real-time Supabase postgres_changes listener with debouncing
-    let syncTimeout: any = null;
-    const triggerSync = () => {
-      if (syncTimeout) clearTimeout(syncTimeout);
-      syncTimeout = setTimeout(() => {
-        storageService.syncWithSupabase();
-      }, 300);
-    };
-
+    // Fine-grained Real-time Supabase postgres_changes listener
     const channel = supabase
       .channel('public:db-sync-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, triggerSync)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, triggerSync)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, triggerSync)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, triggerSync)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, triggerSync)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' }, (payload) => {
+        if (!payload.new) return;
+        const rawTask = mapTaskRowToTask(payload.new);
+        const currentUsers = storageService.getUsers();
+        const normalizedTask = normalizeTaskAssignment(rawTask, currentUsers);
+
+        setTasks((prev) => {
+          const exists = prev.some((t) => t.id === normalizedTask.id);
+          if (exists) {
+            return prev.map((t) => (t.id === normalizedTask.id ? mergeTaskWithTimestamp(t, normalizedTask) : t));
+          }
+          return [normalizedTask, ...prev];
+        });
+
+        const stored = storageService.getTasks();
+        const idx = stored.findIndex((t) => t.id === normalizedTask.id);
+        if (idx >= 0) stored[idx] = mergeTaskWithTimestamp(stored[idx], normalizedTask);
+        else stored.unshift(normalizedTask);
+        storageService.setItem('gnt_tasks', stored);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, (payload) => {
+        if (!payload.new) return;
+        const rawTask = mapTaskRowToTask(payload.new);
+        const currentUsers = storageService.getUsers();
+        const normalizedTask = normalizeTaskAssignment(rawTask, currentUsers);
+
+        setTasks((prev) => {
+          const existing = prev.find((t) => t.id === normalizedTask.id);
+          if (!existing) return [normalizedTask, ...prev];
+          const merged = mergeTaskWithTimestamp(existing, normalizedTask);
+
+          // If status changed by someone else and relevant to current user
+          if (existing.status !== normalizedTask.status && currentUserRef.current) {
+            const me = currentUserRef.current;
+            const isActor = normalizedTask.completedBy === me.name;
+            if (!isActor && (me.role === 'ADMIN' || me.role === 'MANAGER' || isTaskAssignedToUser(normalizedTask, me))) {
+              showToast(
+                `Task Status Updated`,
+                `"${normalizedTask.title}" is now ${normalizedTask.status.replace('_', ' ')}`,
+                'info',
+                {
+                  label: 'View',
+                  onClick: () => setSelectedTaskId(normalizedTask.id),
+                },
+                4000
+              );
+            }
+          }
+          return prev.map((t) => (t.id === normalizedTask.id ? merged : t));
+        });
+
+        const stored = storageService.getTasks();
+        const idx = stored.findIndex((t) => t.id === normalizedTask.id);
+        if (idx >= 0) {
+          stored[idx] = mergeTaskWithTimestamp(stored[idx], normalizedTask);
+          storageService.setItem('gnt_tasks', stored);
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tasks' }, (payload) => {
+        const deletedId = (payload.old as any)?.id;
+        if (deletedId) {
+          setTasks((prev) => prev.filter((t) => t.id !== deletedId));
+          const stored = storageService.getTasks().filter((t) => t.id !== deletedId);
+          storageService.setItem('gnt_tasks', stored);
+          setSelectedTaskId((currId) => (currId === deletedId ? null : currId));
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setUsers((prev) => prev.filter((u) => u.id !== deletedId));
+          }
+        } else if (payload.new) {
+          const user = mapUserRowToUser(payload.new);
+          setUsers((prev) => {
+            const idx = prev.findIndex((u) => u.id === user.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = user;
+              return next;
+            }
+            return [...prev, user];
+          });
+          if (currentUserRef.current?.id === user.id) {
+            setCurrentUser(user);
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setProjects((prev) => prev.filter((p) => p.id !== deletedId));
+          }
+        } else if (payload.new) {
+          const proj = mapProjectRowToProject(payload.new);
+          setProjects((prev) => {
+            const idx = prev.findIndex((p) => p.id === proj.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = proj;
+              return next;
+            }
+            return [...prev, proj];
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setNotifications((prev) => prev.filter((n) => n.id !== deletedId));
+          }
+        } else if (payload.new) {
+          const notif = mapNotificationRowToNotification(payload.new);
+          setNotifications((prev) => {
+            const idx = prev.findIndex((n) => n.id === notif.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = notif;
+              return next;
+            }
+            return [notif, ...prev];
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, (payload) => {
+        if (payload.new) {
+          const act = mapActivityRowToActivity(payload.new);
+          setActivities((prev) => {
+            if (prev.some((a) => a.id === act.id)) return prev;
+            return [act, ...prev].slice(0, 200);
+          });
+        }
+      })
       .subscribe();
 
     // Fast sync when window gains focus or tab becomes visible
@@ -362,13 +503,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('focus', handleVisibilityOrFocus);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
-    // Periodic polling heartbeat (every 4 seconds) to guarantee multi-device state consistency
+    // Periodic polling heartbeat (every 5 seconds) to guarantee multi-device state consistency
     const pollInterval = setInterval(() => {
       storageService.syncWithSupabase();
-    }, 4000);
+    }, 5000);
 
     return () => {
-      if (syncTimeout) clearTimeout(syncTimeout);
       clearInterval(pollInterval);
       unsubscribe();
       window.removeEventListener('hashchange', handleHashChange);
@@ -492,6 +632,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const res = await taskService.createTask(data, currentUser);
     if (res.success && res.task) {
       const created = res.task;
+      setTasks((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
       await refreshAllState();
       showToast(
         'Task Created Successfully',
@@ -513,38 +654,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const employeeUpdateTask = async (taskId: string, updates: any) => {
     if (!currentUser) return { success: false, message: 'User not authenticated' };
+
+    const previousTasks = [...tasks];
+    const previousTask = tasks.find((t) => t.id === taskId);
+    if (!previousTask) return { success: false, message: 'Task not found' };
+
+    // Calculate optimistic updated task
+    const todayStr = getLocalDateString();
+    const newStatus = updates.status || previousTask.status;
+    let newProgress = updates.progress !== undefined ? updates.progress : previousTask.progress;
+    let completedAt = previousTask.completedAt;
+    let completedBy = previousTask.completedBy;
+    let wasOverdue = previousTask.wasOverdue;
+
+    if (newStatus === 'DONE') {
+      newProgress = 100;
+      if (!completedAt) {
+        completedAt = new Date().toISOString();
+        completedBy = currentUser.name;
+      }
+      if (previousTask.dueDate && previousTask.dueDate < todayStr) {
+        wasOverdue = true;
+      }
+    } else if (previousTask.status === 'DONE') {
+      completedAt = undefined;
+      completedBy = undefined;
+      wasOverdue = undefined;
+    }
+
+    const optimisticTask: Task = {
+      ...previousTask,
+      ...updates,
+      status: newStatus,
+      progress: newProgress,
+      blocker: newStatus === 'BLOCKED' ? (updates.blocker ?? previousTask.blocker)?.trim() : undefined,
+      nextAction: updates.nextAction !== undefined ? updates.nextAction.trim() : previousTask.nextAction,
+      notes: updates.notes !== undefined ? updates.notes.trim() : previousTask.notes,
+      expectedCompletionDate: updates.expectedCompletionDate ?? previousTask.expectedCompletionDate,
+      completedAt,
+      completedBy,
+      wasOverdue,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Optimistically update local state immediately
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? optimisticTask : t)));
+
     const res = await taskService.employeeUpdateTask(taskId, updates, currentUser);
     if (res.success && res.task) {
       const updated = res.task;
-      // Immediately update local tasks state so UI reflects the change at once
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      await refreshAllState();
-      showToast(
-        'Task Progress Updated',
-        `"${updated.title}" marked as ${updated.status.replace('_', ' ')} (${updated.progress}%)`,
-        'success',
-        {
-          label: 'View Task',
-          onClick: () => setSelectedTaskId(updated.id),
-        }
-      );
-    } else if (res.success) {
-      await refreshAllState();
-      showToast('Task Updated', res.message, 'success');
+      if (updated.status === 'DONE' && previousTask.status !== 'DONE') {
+        showToast(
+          'Deliverable Completed! 🎉',
+          `"${updated.title}" marked as Done and ready for review.`,
+          'success',
+          {
+            label: 'View in Delivered',
+            onClick: () => {
+              setTaskFilterState((prev: any) => ({ ...prev, quickFilter: 'completed' }));
+            },
+          }
+        );
+      } else {
+        showToast(
+          'Task Progress Updated',
+          `"${updated.title}" marked as ${updated.status.replace('_', ' ')} (${updated.progress}%)`,
+          'success',
+          {
+            label: 'View Task',
+            onClick: () => setSelectedTaskId(updated.id),
+          }
+        );
+      }
     } else {
-      showToast('Update Failed', res.message, 'error');
+      // Rollback on failure
+      setTasks(previousTasks);
+      showToast('Update Failed', res.message || 'Unable to save task updates', 'error');
     }
     return res;
   };
 
   const updateTaskMetadata = async (taskId: string, updates: any) => {
     if (!currentUser) return { success: false, message: 'User not authenticated' };
+
+    const previousTasks = [...tasks];
+    const previousTask = tasks.find((t) => t.id === taskId);
+    if (!previousTask) return { success: false, message: 'Task not found' };
+
+    const optimisticTask: Task = {
+      ...previousTask,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? optimisticTask : t)));
+
     const res = await taskService.updateTaskMetadata(taskId, updates, currentUser);
     if (res.success && res.task) {
       const updated = res.task;
-      // Immediately update local tasks state so all roles see the change at once
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      await refreshAllState();
       showToast(
         'Task Updated Successfully',
         `Saved modifications to "${updated.title}"`,
@@ -554,11 +762,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           onClick: () => setSelectedTaskId(updated.id),
         }
       );
-    } else if (res.success) {
-      await refreshAllState();
-      showToast('Task Configured', res.message, 'success');
     } else {
-      showToast('Update Failed', res.message, 'error');
+      // Rollback on failure
+      setTasks(previousTasks);
+      showToast('Update Failed', res.message || 'Unable to save configuration', 'error');
     }
     return res;
   };

@@ -43,6 +43,19 @@ export interface Project {
   updatedAt: string;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  department?: string;
+  leadId?: string;
+  leadName?: string;
+  memberIds: string[];
+  color?: string; // 'blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'indigo' | 'cyan'
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type DocumentCategory = 'PRD' | 'FRD' | 'TECH_SPEC' | 'DESIGN' | 'OTHER';
 
 export interface TaskAttachment {

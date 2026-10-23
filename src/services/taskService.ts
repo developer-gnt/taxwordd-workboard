@@ -107,9 +107,9 @@ class TaskService {
     data: {
       title: string;
       description?: string;
-      projectId: string;
+      projectId?: string;
       assignedEmployeeId?: string;
-      priority: TaskPriority;
+      priority?: TaskPriority;
       dueDate?: string;
       nextAction?: string;
       notes?: string;
@@ -125,15 +125,11 @@ class TaskService {
     }
 
     if (!data.title?.trim()) {
-      return { success: false, message: 'Task title is required.' };
-    }
-
-    if (!data.projectId?.trim()) {
-      return { success: false, message: 'Project selection is required.' };
+      return { success: false, message: 'Task name is required.' };
     }
 
     const projects = storageService.getProjects();
-    const cleanProjectInput = data.projectId.trim();
+    const cleanProjectInput = data.projectId?.trim() || (projects[0]?.id) || 'TAX WORLDD Deliverables';
     let project = projects.find((p) => p.id === cleanProjectInput);
     if (!project) {
       project = projects.find(
@@ -142,9 +138,9 @@ class TaskService {
           `${p.projectName} (${p.clientName})`.toLowerCase() === cleanProjectInput.toLowerCase()
       );
     }
-    if (!project && cleanProjectInput) {
+    if (!project) {
       let pName = cleanProjectInput;
-      let cName = 'Internal Ops';
+      let cName = 'TAX WORLDD';
       const match = cleanProjectInput.match(/^(.*?)\s*\((.*?)\)$/);
       if (match) {
         pName = match[1].trim();
@@ -185,11 +181,11 @@ class TaskService {
       assignedEmployeeName: assignedUser?.name || 'Unassigned',
       createdById: actor.id,
       createdByName: actor.name,
-      priority: data.priority,
+      priority: data.priority || 'MEDIUM',
       dueDate: cleanDueDate,
       status: 'NOT_STARTED',
       progress: 0,
-      nextAction: data.nextAction?.trim() || '',
+      nextAction: data.nextAction?.trim() || 'Initiate deliverable',
       notes: data.notes?.trim() || '',
       referenceLink: data.referenceLink?.trim() || '',
       estimatedEffort: data.estimatedEffort?.trim() || '',

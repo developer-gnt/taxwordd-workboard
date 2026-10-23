@@ -97,7 +97,7 @@ export const AdminSettings: React.FC = () => {
             <p className="text-xl font-extrabold text-slate-900 mt-1">{tasks.length}</p>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Projects</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Parties</span>
             <p className="text-xl font-extrabold text-slate-900 mt-1">{projects.length}</p>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">

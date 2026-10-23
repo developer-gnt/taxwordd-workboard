@@ -34,6 +34,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   const { projects, tasks, deleteProject, navigateTo, currentUser } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [groupFilter, setGroupFilter] = useState<string>('ALL');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Pagination state
@@ -54,6 +55,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       if (!match) return false;
     }
     if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+    if (groupFilter !== 'ALL' && p.clientName !== groupFilter) return false;
     return true;
   });
 
@@ -83,7 +85,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
           <input
             id="input-project-search"
             type="text"
-            placeholder="Search projects, clients, or descriptions..."
+            placeholder="Search parties, clients, or descriptions..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -105,6 +107,25 @@ export const ProjectList: React.FC<ProjectListProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Group Dropdown Filter */}
+          <div className="flex items-center gap-1.5">
+            <select
+              id="select-project-group-filter"
+              value={groupFilter}
+              onChange={(e) => {
+                setGroupFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+            >
+              <option value="ALL">All Groups ({projects.length})</option>
+              <option value="Group A">Group A ({projects.filter((p) => p.clientName === 'Group A').length})</option>
+              <option value="Group B">Group B ({projects.filter((p) => p.clientName === 'Group B').length})</option>
+              <option value="Group C">Group C ({projects.filter((p) => p.clientName === 'Group C').length})</option>
+              <option value="Group D">Group D ({projects.filter((p) => p.clientName === 'Group D').length})</option>
+            </select>
+          </div>
+
           {/* Status Dropdown */}
           <div className="flex items-center gap-1.5">
             <select
@@ -131,7 +152,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
               className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Create Project</span>
+              <span>Create Party</span>
             </button>
           )}
         </div>
@@ -143,17 +164,18 @@ export const ProjectList: React.FC<ProjectListProps> = ({
           <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
             <FolderKanban className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-slate-800 mb-1">No projects found</h3>
+          <h3 className="text-sm font-bold text-slate-800 mb-1">No parties found</h3>
           <p className="text-xs text-slate-500 max-w-sm mb-4">
-            {search || statusFilter !== 'ALL'
-              ? 'No projects match your active search and status filters.'
-              : 'Get started by creating your first client project or account.'}
+            {search || statusFilter !== 'ALL' || groupFilter !== 'ALL'
+              ? 'No parties match your active search and filters.'
+              : 'Get started by creating your first party or client account.'}
           </p>
-          {(search || statusFilter !== 'ALL') ? (
+          {(search || statusFilter !== 'ALL' || groupFilter !== 'ALL') ? (
             <button
               onClick={() => {
                 setSearch('');
                 setStatusFilter('ALL');
+                setGroupFilter('ALL');
                 setCurrentPage(1);
               }}
               className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
@@ -166,7 +188,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-colors flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
-              <span>Create First Project</span>
+              <span>Create First Party</span>
             </button>
           ) : null}
         </div>
@@ -293,7 +315,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                       <button
                         onClick={() => onOpenEditProject(proj)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                        title="Edit Project"
+                        title="Edit Party"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
@@ -320,7 +342,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                         <button
                           onClick={() => setConfirmDeleteId(proj.id)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                          title="Delete Project"
+                          title="Delete Party"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -344,7 +366,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
             </span>
             <span>of</span>
             <span className="font-bold text-slate-900">{totalItems}</span>
-            <span>projects</span>
+            <span>parties</span>
 
             <div className="ml-2 flex items-center gap-1.5">
               <span className="text-slate-300">|</span>
@@ -358,10 +380,10 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                 }}
                 className="px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
               >
-                <option value={6}>6</option>
-                <option value={9}>9</option>
                 <option value={12}>12</option>
                 <option value={24}>24</option>
+                <option value={48}>48</option>
+                <option value={84}>84 (All)</option>
                 <option value="ALL">All</option>
               </select>
             </div>

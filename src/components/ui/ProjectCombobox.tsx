@@ -17,7 +17,7 @@ export const ProjectCombobox: React.FC<ProjectComboboxProps> = ({
   value,
   onChange,
   required = false,
-  placeholder = 'e.g. Phoenix Enterprise Cloud (Phoenix Financial)',
+  placeholder = 'e.g. Reliance Industries / Sharma & Co',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,7 +87,7 @@ export const ProjectCombobox: React.FC<ProjectComboboxProps> = ({
         <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-2xl border border-slate-200/90 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 max-h-56 overflow-y-auto pr-1">
           {filteredProjects.length === 0 ? (
             <div className="p-3 text-center text-slate-400 text-xs font-medium">
-              No matching projects found. You can type to enter a custom project name.
+              No matching parties found. You can type to enter a custom party name.
             </div>
           ) : (
             <div className="p-1.5 space-y-0.5">

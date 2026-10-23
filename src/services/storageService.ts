@@ -1,17 +1,18 @@
-import { User, Project, Task, TaskActivity, Notification, SystemStats } from '../types';
-import { SEED_USERS, SEED_PROJECTS, SEED_TASKS, SEED_ACTIVITIES, SEED_NOTIFICATIONS } from '../data/seedData';
+import { User, Project, Team, Task, TaskActivity, Notification, SystemStats } from '../types';
+import { SEED_USERS, SEED_PROJECTS, SEED_TEAMS, SEED_TASKS, SEED_ACTIVITIES, SEED_NOTIFICATIONS } from '../data/seedData';
 import { supabaseDb } from './supabaseDb';
 
-const STORAGE_KEYS = {
-  USERS: 'gnt_users',
-  PROJECTS: 'gnt_projects',
-  TASKS: 'gnt_tasks',
-  ACTIVITIES: 'gnt_task_activity',
-  NOTIFICATIONS: 'gnt_notifications',
-  CLEARED_OVERDUE: 'gnt_cleared_overdue_notifs',
-  SESSION: 'gnt_session',
-  SETTINGS: 'gnt_settings',
-  INITIALIZED: 'gnt_workboard_fresh_v1',
+export const STORAGE_KEYS = {
+  USERS: 'taxworldd_users',
+  PROJECTS: 'taxworldd_projects',
+  TASKS: 'taxworldd_tasks',
+  ACTIVITIES: 'taxworldd_task_activity',
+  NOTIFICATIONS: 'taxworldd_notifications',
+  CLEARED_OVERDUE: 'taxworldd_cleared_overdue_notifs',
+  SESSION: 'taxworldd_session',
+  SETTINGS: 'taxworldd_settings',
+  TEAMS: 'taxworldd_teams',
+  INITIALIZED: 'taxworldd_parties_groups_v5',
 };
 
 class StorageService {
@@ -43,6 +44,18 @@ class StorageService {
     try {
       const isInit = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
       if (isInit !== 'true') {
+        // Automatically purge any old demo cache keys from user's browser
+        try {
+          const keysToPurge: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('gnt_') || k.startsWith('taxworldd_'))) {
+              keysToPurge.push(k);
+            }
+          }
+          keysToPurge.forEach((k) => localStorage.removeItem(k));
+        } catch { }
+
         this.resetToSeedData();
       }
       this.isInitialized = true;
@@ -55,13 +68,15 @@ class StorageService {
     try {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(SEED_USERS || []));
       localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(SEED_PROJECTS || []));
+      localStorage.setItem(STORAGE_KEYS.TEAMS, JSON.stringify(SEED_TEAMS || []));
       localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(SEED_TASKS || []));
       localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(SEED_ACTIVITIES || []));
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(SEED_NOTIFICATIONS || []));
+      localStorage.removeItem(STORAGE_KEYS.SESSION);
       localStorage.setItem(
         STORAGE_KEYS.SETTINGS,
         JSON.stringify({
-          systemName: 'GNT Workboard',
+          systemName: 'TAX WORLDD',
           version: '1.0-FRESH',
           deployedEnvironment: 'Internal Operations',
           updatedAt: new Date().toISOString(),
@@ -220,6 +235,33 @@ class StorageService {
     const projects = this.getProjects().filter((p) => p.id !== projectId);
     this.setItem(STORAGE_KEYS.PROJECTS, projects);
     return deleted;
+  }
+
+  // ==================== TEAMS ====================
+  public getTeams(): Team[] {
+    return this.getItem<Team[]>(STORAGE_KEYS.TEAMS, SEED_TEAMS || []);
+  }
+
+  public setTeams(teams: Team[]): void {
+    this.setItem(STORAGE_KEYS.TEAMS, teams);
+  }
+
+  public async saveTeam(team: Team): Promise<boolean> {
+    const teams = this.getTeams();
+    const idx = teams.findIndex((t) => t.id === team.id);
+    if (idx >= 0) {
+      teams[idx] = team;
+    } else {
+      teams.unshift(team);
+    }
+    this.setItem(STORAGE_KEYS.TEAMS, teams);
+    return true;
+  }
+
+  public async deleteTeam(teamId: string): Promise<boolean> {
+    const teams = this.getTeams().filter((t) => t.id !== teamId);
+    this.setItem(STORAGE_KEYS.TEAMS, teams);
+    return true;
   }
 
   // ==================== TASKS ====================

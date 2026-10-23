@@ -19,6 +19,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Users2,
 } from 'lucide-react';
 
 interface TeamTableProps {
@@ -34,15 +35,17 @@ export const TeamTable: React.FC<TeamTableProps> = ({
   onOpenResetPin,
   onOpenChangeRole,
 }) => {
-  const { users, tasks, currentUser, toggleUserActive, deleteUser, navigateTo } = useApp();
+  const { users, teams, tasks, currentUser, toggleUserActive, deleteUser, navigateTo } = useApp();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [groupFilter, setGroupFilter] = useState<string>('ALL');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(25);
 
   const canManageUsers = authService.canManageUsers(currentUser);
+  const targetTeamsRoute = currentUser?.role === 'ADMIN' ? '/admin/teams' : '/manager/teams';
 
   const filtered = users.filter((u) => {
     if (search.trim()) {
@@ -54,6 +57,7 @@ export const TeamTable: React.FC<TeamTableProps> = ({
       if (!match) return false;
     }
     if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
+    if (groupFilter !== 'ALL' && (u.department || '') !== groupFilter) return false;
     return true;
   });
 
@@ -74,6 +78,36 @@ export const TeamTable: React.FC<TeamTableProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Tab Navigation: Employees vs Teams */}
+      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100/90 border border-slate-200/60">
+          <button
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 shadow-xs transition-all cursor-default"
+          >
+            <Users className="w-3.5 h-3.5 text-blue-600" />
+            <span>All Staff ({users.length})</span>
+          </button>
+
+          <button
+            onClick={() => navigateTo(targetTeamsRoute)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 transition-all cursor-pointer"
+          >
+            <Users2 className="w-3.5 h-3.5 text-slate-500" />
+            <span>Teams & Pods ({teams.length})</span>
+          </button>
+        </div>
+
+        {canManageUsers && (
+          <button
+            onClick={onOpenAddUser}
+            className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-semibold text-xs shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Employee</span>
+          </button>
+        )}
+      </div>
+
       {/* Top Filter & Add Team Member */}
       <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="relative flex-1">
@@ -88,12 +122,27 @@ export const TeamTable: React.FC<TeamTableProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Group Filter */}
+          <select
+            id="select-team-group-filter"
+            value={groupFilter}
+            onChange={(e) => { setGroupFilter(e.target.value); setCurrentPage(1); }}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="ALL">All Groups</option>
+            <option value="Group A">Group A ({users.filter((u) => u.department === 'Group A').length})</option>
+            <option value="Group B">Group B ({users.filter((u) => u.department === 'Group B').length})</option>
+            <option value="Group C">Group C ({users.filter((u) => u.department === 'Group C').length})</option>
+            <option value="Group D">Group D ({users.filter((u) => u.department === 'Group D').length})</option>
+          </select>
+
+          {/* Role Filter */}
           <select
             id="select-team-role-filter"
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+            onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Roles</option>
             <option value="ADMIN">Admins</option>
@@ -122,7 +171,7 @@ export const TeamTable: React.FC<TeamTableProps> = ({
               <tr className="bg-slate-50/80 text-slate-500 uppercase font-semibold border-b border-slate-200/80 text-[11px] tracking-wider">
                 <th className="py-3 px-4">Employee</th>
                 <th className="py-3 px-3">Role</th>
-                <th className="py-3 px-3">Department</th>
+                <th className="py-3 px-3">Group</th>
                 <th className="py-3 px-3 text-center">Active Tasks</th>
                 <th className="py-3 px-3 text-center">Completed</th>
                 <th className="py-3 px-3">Status</th>
@@ -166,9 +215,27 @@ export const TeamTable: React.FC<TeamTableProps> = ({
                       </span>
                     </td>
 
-                    {/* Department */}
-                    <td className="py-3 px-3 text-slate-600 font-medium">
-                      {u.department || 'Operations'}
+                    {/* Group */}
+                    <td className="py-3 px-3">
+                      {u.department ? (
+                        <span
+                          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            u.department === 'Group A'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : u.department === 'Group B'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : u.department === 'Group C'
+                              ? 'bg-violet-50 text-violet-700 border-violet-200'
+                              : u.department === 'Group D'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          {u.department}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">—</span>
+                      )}
                     </td>
 
                     {/* Active Tasks */}

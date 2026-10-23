@@ -222,7 +222,7 @@ export const MonthlyReportView: React.FC = () => {
           <GntLogo variant="full" size="md" />
         </div>
         <h1 className="text-xl font-bold text-slate-900 uppercase tracking-tight">
-          GNT Workboard — {viewMode === 'INDIVIDUAL' ? `Employee Performance Review (${activeEmployee?.name})` : 'Monthly Performance Review'}
+          TAX WORLDD — {viewMode === 'INDIVIDUAL' ? `Employee Performance Review (${activeEmployee?.name})` : 'Monthly Performance Review'}
         </h1>
         <p className="text-xs text-slate-600 mt-1">
           Review Cycle: {overallReport.monthLabel} • Generated: {new Date(overallReport.generatedAt).toLocaleString()}
@@ -381,7 +381,7 @@ export const MonthlyReportView: React.FC = () => {
                     <thead>
                       <tr className="bg-slate-50/50 text-slate-500 uppercase font-semibold border-b border-slate-200 text-[10px] tracking-wider">
                         <th className="py-2.5 px-4">Deliverable Title</th>
-                        <th className="py-2.5 px-3">Project & Client</th>
+                        <th className="py-2.5 px-3">Party & Client</th>
                         <th className="py-2.5 px-3">Deadline</th>
                         <th className="py-2.5 px-3">Status</th>
                         <th className="py-2.5 px-3">Outcome</th>
@@ -606,7 +606,7 @@ export const MonthlyReportView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <FolderKanban className="w-4 h-4 text-blue-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Project Delivery & Client Health
+                  Party Delivery & Client Health
                 </h3>
               </div>
               <span className="text-[11px] text-slate-400">Aggregated milestone progress</span>
@@ -616,7 +616,7 @@ export const MonthlyReportView: React.FC = () => {
               <table id="table-report-project-summary" className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 text-slate-500 uppercase font-semibold border-b border-slate-200/80 text-[10px] tracking-wider">
-                    <th className="py-2.5 px-4">Project</th>
+                    <th className="py-2.5 px-4">Party</th>
                     <th className="py-2.5 px-3">Client</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-center">Deliverables</th>

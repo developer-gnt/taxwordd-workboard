@@ -153,7 +153,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, isOpen, onCl
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="edit-task-project-select" className="block font-bold text-slate-700 mb-1">
-                Project or Client <span className="text-rose-500">*</span>
+                Party Name <span className="text-rose-500">*</span>
               </label>
               <ProjectCombobox
                 id="edit-task-project-select"

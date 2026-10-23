@@ -402,14 +402,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             <option value="LOW">Low</option>
           </select>
 
-          {/* Project filter */}
+          {/* Party filter */}
           <select
             id="select-filter-project"
             value={taskFilterState.projectId || ''}
             onChange={(e) => handleProjectFilterChange(e.target.value)}
             className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500 max-w-[140px] truncate"
           >
-            <option value="">All Projects</option>
+            <option value="">All Parties</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.projectName}
@@ -471,7 +471,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             <table id="table-tasks-list" className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 text-slate-500 uppercase font-semibold border-b border-slate-200/80 text-[11px] tracking-wider">
-                  <th className="py-3 px-4 font-semibold">Task & Project</th>
+                  <th className="py-3 px-4 font-semibold">Task & Party</th>
                   <th className="py-3 px-3 font-semibold">Owner</th>
                   <th className="py-3 px-3 font-semibold">Priority</th>
                   <th className="py-3 px-3 font-semibold">Assigned Date & Time</th>

@@ -70,8 +70,8 @@ export const ProjectProgressCard: React.FC<ProjectProgressCardProps> = ({ projec
             <FolderKanban className="w-4 h-4 stroke-[2]" />
           </span>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Project Delivery Progress</h3>
-            <p className="text-xs text-slate-500">Client milestones & operational execution</p>
+            <h3 className="text-sm font-bold text-slate-900">Party Delivery Progress</h3>
+            <p className="text-xs text-slate-500">Party deliverables & operational execution</p>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export const ProjectProgressCard: React.FC<ProjectProgressCardProps> = ({ projec
           onClick={() => navigateTo(targetProjectsRoute)}
           className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
         >
-          <span>All Projects</span>
+          <span>All Parties</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -89,8 +89,8 @@ export const ProjectProgressCard: React.FC<ProjectProgressCardProps> = ({ projec
         {displayedProjects.length === 0 ? (
           <div className="py-8 text-center">
             <FolderKanban className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-700">No projects created yet</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Create your first client project to track deliverables</p>
+            <p className="text-xs font-semibold text-slate-700">No parties created yet</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Create your first party to track deliverables</p>
           </div>
         ) : (
           displayedProjects.map(({ project, total, completed, dueToday, overdue, blocked, active, completionPct }) => (

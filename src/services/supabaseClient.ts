@@ -11,10 +11,14 @@ export const isSupabaseConfigured = Boolean(
   !SUPABASE_ANON_KEY.includes('your-anon-key')
 );
 
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Fallback dummy URL so createClient does not crash if Supabase is unconfigured / offline
+const validUrl = isSupabaseConfigured ? SUPABASE_URL : 'https://placeholder-offline.supabase.co';
+const validKey = isSupabaseConfigured ? SUPABASE_ANON_KEY : 'placeholder-anon-key';
+
+export const supabase: SupabaseClient = createClient(validUrl, validKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: isSupabaseConfigured,
+    autoRefreshToken: isSupabaseConfigured,
   },
 });
 
@@ -27,6 +31,14 @@ export async function testSupabaseConnection(): Promise<{
   latencyMs?: number;
   error?: string;
 }> {
+  if (!isSupabaseConfigured) {
+    return {
+      connected: false,
+      url: '',
+      error: 'Running in offline / local storage mode. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env to connect to your Supabase project.',
+    };
+  }
+
   const start = performance.now();
   try {
     // Attempt a lightweight ping query
@@ -66,10 +78,10 @@ export async function testSupabaseConnection(): Promise<{
 }
 
 /**
- * Full PostgreSQL schema script for GNT Workboard
+ * Full PostgreSQL schema script for TAX WORLDD
  * Copy-pasteable into Supabase SQL Editor
  */
-export const SUPABASE_SQL_SCHEMA = `-- GNT Workboard Database Schema for Supabase
+export const SUPABASE_SQL_SCHEMA = `-- TAX WORLDD Database Schema for Supabase
 -- Run this in Supabase SQL Editor (Dashboard > SQL Editor > New Query)
 
 -- 1. Users Table
@@ -183,6 +195,24 @@ DROP POLICY IF EXISTS "Allow authenticated access notifications" ON public.notif
 DROP POLICY IF EXISTS "Allow all access notifications" ON public.notifications;
 CREATE POLICY "Allow all access notifications" ON public.notifications FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
+-- 6. Teams Table
+CREATE TABLE IF NOT EXISTS public.teams (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  department TEXT,
+  description TEXT,
+  lead_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
+  lead_name TEXT,
+  member_ids JSONB DEFAULT '[]'::jsonb,
+  color TEXT DEFAULT 'blue',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all access teams" ON public.teams;
+CREATE POLICY "Allow all access teams" ON public.teams FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
 -- Migration: Ensure optional due_date and was_overdue column exist
 ALTER TABLE public.tasks ALTER COLUMN due_date DROP NOT NULL;
 ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS was_overdue BOOLEAN DEFAULT false;
@@ -191,7 +221,7 @@ ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS was_overdue BOOLEAN DEFAULT fa
 DO $$
 BEGIN
   BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.users, public.projects, public.tasks, public.activities, public.notifications;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.users, public.projects, public.tasks, public.activities, public.notifications, public.teams;
   EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;

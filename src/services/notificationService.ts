@@ -243,7 +243,7 @@ class NotificationService {
         if (perm === 'granted') {
           this.playNotificationSound();
           this.sendBrowserNotification(
-            'GNT WorkBoard Alerts Enabled',
+            'TAX WORLDD Alerts Enabled',
             'You will now receive desktop notifications for task updates, assignments, and deadlines.'
           );
         }
@@ -289,7 +289,7 @@ class NotificationService {
         if (perm !== 'granted') return false;
       }
       this.sendBrowserNotification(
-        '🔔 Test Alert: GNT WorkBoard',
+        '🔔 Test Alert: TAX WORLDD',
         'Site notifications are configured and active! You will receive real-time updates.'
       );
       return true;

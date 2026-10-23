@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GntLogo } from '../../components/common/GntLogo';
+import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { UserRole } from '../../types';
 import {
   ShieldCheck,
@@ -132,17 +133,24 @@ export const LoginView: React.FC = () => {
         </div>
 
         <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
-          GNT Workboard
+          TAX WORLDD
         </h1>
         <p className="mt-1 text-xs font-medium text-slate-500 max-w-xs mx-auto">
           Operational accountability & deliverables management for enterprise teams
         </p>
 
-        {/* Supabase Auth Badge */}
-        <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[11px] font-semibold">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Secured with Supabase Authentication</span>
-        </div>
+        {/* Auth Mode Badge */}
+        {isSupabaseConfigured ? (
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-[11px] font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Secured with Supabase Authentication</span>
+          </div>
+        ) : (
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 text-blue-700 text-[11px] font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+            <span>Local Storage Offline Mode</span>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
@@ -204,7 +212,7 @@ export const LoginView: React.FC = () => {
                   <input
                     type="email"
                     required
-                    placeholder="name@gnt.com"
+                    placeholder="name@gmail.com"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"

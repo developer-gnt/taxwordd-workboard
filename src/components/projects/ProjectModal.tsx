@@ -81,9 +81,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, isOpen, onC
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {isEditing ? 'Edit Project Details' : 'Create New Client Project'}
+              {isEditing ? 'Edit Party Details' : 'Create New Party'}
             </h2>
-            <p className="text-xs text-slate-500">Track initiatives and deliverables under structured client portfolios</p>
+            <p className="text-xs text-slate-500">Track initiatives and deliverables under structured party accounts</p>
           </div>
           <button
             onClick={onClose}
@@ -103,13 +103,13 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, isOpen, onC
 
           <div>
             <label htmlFor="input-project-name" className="block font-bold text-slate-700 mb-1">
-              Project Name <span className="text-rose-500">*</span>
+              Party Name <span className="text-rose-500">*</span>
             </label>
             <input
               id="input-project-name"
               type="text"
               required
-              placeholder="e.g. Phoenix Enterprise Cloud"
+              placeholder="e.g. Reliance Industries / Sharma & Co"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
@@ -118,13 +118,13 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, isOpen, onC
 
           <div>
             <label htmlFor="input-project-client" className="block font-bold text-slate-700 mb-1">
-              Client / Account Name <span className="text-rose-500">*</span>
+              Client / Group Name <span className="text-rose-500">*</span>
             </label>
             <input
               id="input-project-client"
               type="text"
               required
-              placeholder="e.g. Phoenix Financial Corp"
+              placeholder="e.g. Corporate Accounts / Group"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
@@ -133,7 +133,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, isOpen, onC
 
           <div>
             <label htmlFor="select-project-status" className="block font-bold text-slate-700 mb-1">
-              Project Operational Status <span className="text-rose-500">*</span>
+              Party Operational Status <span className="text-rose-500">*</span>
             </label>
             <select
               id="select-project-status"
@@ -150,12 +150,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, isOpen, onC
 
           <div>
             <label htmlFor="input-project-description" className="block font-medium text-slate-600 mb-1">
-              Scope Description (Optional)
+              Scope / Notes (Optional)
             </label>
             <textarea
               id="input-project-description"
               rows={2}
-              placeholder="Strategic goals, contract targets, or client context..."
+              placeholder="Strategic goals, compliance requirements, or client context..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
@@ -176,7 +176,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, isOpen, onC
               disabled={loading}
               className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs transition-colors flex items-center gap-2"
             >
-              {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Project'}
+              {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Party'}
             </button>
           </div>
         </form>

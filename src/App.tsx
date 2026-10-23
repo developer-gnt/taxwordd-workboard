@@ -9,6 +9,7 @@ import { EmployeeTasksView } from './pages/employee/EmployeeTasksView';
 import { TaskTable } from './components/tasks/TaskTable';
 import { ProjectList } from './components/projects/ProjectList';
 import { TeamTable } from './components/team/TeamTable';
+import { TeamsView } from './components/team/TeamsView';
 import { MonthlyReportView } from './components/reports/MonthlyReportView';
 import { NotificationCenter } from './components/notifications/NotificationCenter';
 import { AdminSettings } from './pages/admin/AdminSettings';
@@ -33,7 +34,7 @@ import { DraggableCreateTaskFAB } from './components/navigation/DraggableCreateT
 import { authService } from './services/authService';
 
 const MainAppLayout: React.FC = () => {
-  const { currentUser, activeRoute, tasks } = useApp();
+  const { currentUser, activeRoute, tasks, navigateTo } = useApp();
 
   // Mobile sidebar visibility
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -90,13 +91,18 @@ const MainAppLayout: React.FC = () => {
       pageSubtitle = 'Master table of all company tasks, deadlines, owners, and next actions';
       break;
     case '/admin/projects':
-      pageTitle = 'Projects & Client Accounts';
-      pageSubtitle = 'Strategic initiatives and milestone progress tracking';
+      pageTitle = 'Parties & Client Accounts';
+      pageSubtitle = 'Strategic party initiatives and deliverable progress tracking';
       break;
     case '/admin/team':
     case '/manager/team':
       pageTitle = 'Employees & Access Management';
       pageSubtitle = 'Accountability assignments, permissions, and security credentials';
+      break;
+    case '/admin/teams':
+    case '/manager/teams':
+      pageTitle = 'Functional Teams & Pods';
+      pageSubtitle = 'Organize employees into operational units, assign leads, and monitor team workload';
       break;
     case '/admin/reports':
     case '/manager/reports':
@@ -116,8 +122,8 @@ const MainAppLayout: React.FC = () => {
       pageSubtitle = 'Monitor progress, review submitted deliverables, and resolve impediments';
       break;
     case '/manager/projects':
-      pageTitle = 'Initiatives & Project Health';
-      pageSubtitle = 'Client deliverable completion and delivery velocity';
+      pageTitle = 'Parties & Client Accounts';
+      pageSubtitle = 'Party deliverable completion and delivery velocity';
       break;
     case '/employee/tasks':
       pageTitle = 'My Task Deliverables';
@@ -139,7 +145,7 @@ const MainAppLayout: React.FC = () => {
       pageSubtitle = 'Task assignments, blocker escalations, and deadline warnings';
       break;
     default:
-      pageTitle = 'GNT Workboard';
+      pageTitle = 'TAX WORLDD';
       pageSubtitle = 'Operational Management System';
   }
 
@@ -204,6 +210,9 @@ const MainAppLayout: React.FC = () => {
               onOpenChangeRole={(u) => setSelectedUserForChangeRole(u)}
             />
           )}
+          {activeRoute === '/admin/teams' && (
+            <TeamsView onSwitchToEmployees={() => navigateTo('/admin/team')} />
+          )}
           {activeRoute === '/admin/reports' && <MonthlyReportView />}
           {activeRoute === '/admin/settings' && <AdminSettings />}
 
@@ -238,6 +247,9 @@ const MainAppLayout: React.FC = () => {
               onOpenResetPin={(u) => setSelectedUserForResetPin(u)}
               onOpenChangeRole={(u) => setSelectedUserForChangeRole(u)}
             />
+          )}
+          {activeRoute === '/manager/teams' && (
+            <TeamsView onSwitchToEmployees={() => navigateTo('/manager/team')} />
           )}
           {activeRoute === '/manager/reports' && <MonthlyReportView />}
 

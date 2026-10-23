@@ -15,6 +15,7 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  Users2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,8 +43,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ? [
           { label: 'Dashboard', route: '/admin/dashboard', icon: LayoutDashboard },
           { label: 'Tasks', route: '/admin/tasks', icon: CheckSquare },
+          { label: 'Parties', route: '/admin/projects', icon: FolderKanban },
           { label: 'Employees', route: '/admin/team', icon: Users },
-          { label: 'Projects', route: '/admin/projects', icon: FolderKanban },
+          { label: 'Teams', route: '/admin/teams', icon: Users2 },
           { label: 'Reports', fullLabel: 'Monthly Reports', route: '/admin/reports', icon: FileBarChart2 },
           { label: 'Notifications', route: '/notifications', icon: Bell, badge: unreadNotificationCount },
           { label: 'Settings', route: '/admin/settings', icon: Settings },
@@ -53,8 +55,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ? [
           { label: 'Dashboard', route: '/manager/dashboard', icon: LayoutDashboard },
           { label: 'Tasks', route: '/manager/tasks', icon: CheckSquare },
-          { label: 'Projects', route: '/manager/projects', icon: FolderKanban },
+          { label: 'Parties', route: '/manager/projects', icon: FolderKanban },
           { label: 'Employees', route: '/manager/team', icon: Users },
+          { label: 'Teams', route: '/manager/teams', icon: Users2 },
           { label: 'Reports', fullLabel: 'Monthly Reports', route: '/manager/reports', icon: FileBarChart2 },
           { label: 'Notifications', route: '/notifications', icon: Bell, badge: unreadNotificationCount },
           { label: 'Profile', route: '/employee/profile', icon: UserCheck },
@@ -113,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Menu className="w-5 h-5" />
                 </button>
               )}
-              <div title="GIGA NEXUS TECHNOLOGY">
+              <div title="TAX WORLDD">
                 <GntLogo variant="icon" size="sm" className="w-8 h-8" />
               </div>
             </div>

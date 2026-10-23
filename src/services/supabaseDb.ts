@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { User, Project, Task, TaskActivity, Notification } from '../types';
 
 // ==================== ROW MAPPERS FOR REALTIME & QUERIES ====================
@@ -95,6 +95,7 @@ export class SupabaseDbService {
 
   // ==================== USERS ====================
   public async fetchUsers(): Promise<User[] | null> {
+    if (!isSupabaseConfigured) return null;
     try {
       const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: true });
       if (error) {
@@ -110,6 +111,7 @@ export class SupabaseDbService {
   }
 
   public async upsertUser(user: User): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const payload = {
         id: user.id,
@@ -137,7 +139,7 @@ export class SupabaseDbService {
   }
 
   public async upsertUsers(users: User[]): Promise<boolean> {
-    if (users.length === 0) return true;
+    if (!isSupabaseConfigured || users.length === 0) return true;
     try {
       const payloads = users.map((u) => ({
         id: u.id,
@@ -165,6 +167,7 @@ export class SupabaseDbService {
   }
 
   public async deleteUser(userId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       // 1. Unassign user from tasks to avoid FK conflicts
       await supabase
@@ -195,6 +198,7 @@ export class SupabaseDbService {
 
   // ==================== PROJECTS ====================
   public async fetchProjects(): Promise<Project[] | null> {
+    if (!isSupabaseConfigured) return null;
     try {
       const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: true });
       if (error) {
@@ -210,6 +214,7 @@ export class SupabaseDbService {
   }
 
   public async upsertProject(project: Project): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const payload = {
         id: project.id,
@@ -233,7 +238,7 @@ export class SupabaseDbService {
   }
 
   public async upsertProjects(projects: Project[]): Promise<boolean> {
-    if (projects.length === 0) return true;
+    if (!isSupabaseConfigured || projects.length === 0) return true;
     try {
       const payloads = projects.map((p) => ({
         id: p.id,
@@ -257,6 +262,7 @@ export class SupabaseDbService {
   }
 
   public async deleteProject(projectId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const { error } = await supabase.from('projects').delete().eq('id', projectId);
       if (error) {
@@ -272,6 +278,7 @@ export class SupabaseDbService {
 
   // ==================== TASKS ====================
   public async fetchTasks(): Promise<Task[] | null> {
+    if (!isSupabaseConfigured) return null;
     try {
       const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
       if (error) {
@@ -287,6 +294,7 @@ export class SupabaseDbService {
   }
 
   public async upsertTask(task: Task): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const payload: any = {
         id: task.id,
@@ -356,7 +364,7 @@ export class SupabaseDbService {
   }
 
   public async upsertTasks(tasks: Task[]): Promise<boolean> {
-    if (tasks.length === 0) return true;
+    if (!isSupabaseConfigured || tasks.length === 0) return true;
     try {
       const payloads = tasks.map((task) => ({
         id: task.id,
@@ -410,6 +418,7 @@ export class SupabaseDbService {
   }
 
   public async deleteTask(taskId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       // 1. Delete task from tasks table
       const { error } = await supabase.from('tasks').delete().eq('id', taskId);
@@ -431,6 +440,7 @@ export class SupabaseDbService {
 
   // ==================== ACTIVITIES ====================
   public async fetchActivities(): Promise<TaskActivity[] | null> {
+    if (!isSupabaseConfigured) return null;
     try {
       const { data, error } = await supabase.from('activities').select('*').order('timestamp', { ascending: false }).limit(100);
       if (error) {
@@ -446,6 +456,7 @@ export class SupabaseDbService {
   }
 
   public async upsertActivity(activity: TaskActivity): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const payload = {
         id: activity.id,
@@ -472,7 +483,7 @@ export class SupabaseDbService {
   }
 
   public async upsertActivities(activities: TaskActivity[]): Promise<boolean> {
-    if (activities.length === 0) return true;
+    if (!isSupabaseConfigured || activities.length === 0) return true;
     try {
       const payloads = activities.map((a) => ({
         id: a.id,
@@ -500,6 +511,7 @@ export class SupabaseDbService {
 
   // ==================== NOTIFICATIONS ====================
   public async fetchNotifications(): Promise<Notification[] | null> {
+    if (!isSupabaseConfigured) return null;
     try {
       const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(100);
       if (error) {
@@ -515,6 +527,7 @@ export class SupabaseDbService {
   }
 
   public async upsertNotification(notification: Notification): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const payload = {
         id: notification.id,
@@ -539,7 +552,7 @@ export class SupabaseDbService {
   }
 
   public async upsertNotifications(notifications: Notification[]): Promise<boolean> {
-    if (notifications.length === 0) return true;
+    if (!isSupabaseConfigured || notifications.length === 0) return true;
     try {
       const payloads = notifications.map((n) => ({
         id: n.id,
@@ -564,6 +577,7 @@ export class SupabaseDbService {
   }
 
   public async deleteNotification(notificationId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
       if (error) {
@@ -578,6 +592,7 @@ export class SupabaseDbService {
   }
 
   public async deleteNotificationsForUser(userId: string, readOnly = false): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
     try {
       let query = supabase.from('notifications').delete().eq('user_id', userId);
       if (readOnly) {
@@ -612,6 +627,7 @@ export class SupabaseDbService {
       notifications: Notification[];
     }) => void
   ): Promise<void> {
+    if (!isSupabaseConfigured) return;
     if (this.isSyncing) return;
     this.isSyncing = true;
 

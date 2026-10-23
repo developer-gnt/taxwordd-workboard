@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { User, Task, Project, TaskActivity, Notification, TaskStatus, TaskPriority, ProjectStatus, UserRole, QuickFilterType } from '../types';
+import { User, Task, Project, Team, TaskActivity, Notification, TaskStatus, TaskPriority, ProjectStatus, UserRole, QuickFilterType } from '../types';
 import { formatLocalDateDisplay, getLocalDateString } from '../utils/dateUtils';
 import { storageService } from '../services/storageService';
 import { authService, LoginResult } from '../services/authService';
-import { supabase } from '../services/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { taskService } from '../services/taskService';
 import { userService } from '../services/userService';
 import { projectService } from '../services/projectService';
+import { teamService, CreateTeamPayload } from '../services/teamService';
 import { notificationService } from '../services/notificationService';
 import {
   mapUserRowToUser,
@@ -37,6 +38,7 @@ interface AppContextType {
   currentUser: User | null;
   users: User[];
   projects: Project[];
+  teams: Team[];
   tasks: Task[];
   activities: TaskActivity[];
   notifications: Notification[];
@@ -82,12 +84,12 @@ interface AppContextType {
   // Task Actions
   createTask: (data: {
     title: string;
-    description: string;
-    projectId: string;
-    assignedEmployeeId: string;
-    priority: TaskPriority;
-    dueDate: string;
-    nextAction: string;
+    description?: string;
+    projectId?: string;
+    assignedEmployeeId?: string;
+    priority?: TaskPriority;
+    dueDate?: string;
+    nextAction?: string;
     notes?: string;
     referenceLink?: string;
     estimatedEffort?: string;
@@ -147,6 +149,11 @@ interface AppContextType {
   ) => Promise<{ success: boolean; message: string }>;
 
   deleteProject: (id: string) => Promise<{ success: boolean; message: string }>;
+
+  // Team Actions
+  createTeam: (data: CreateTeamPayload) => Promise<{ success: boolean; message: string; team?: Team }>;
+  updateTeam: (id: string, updates: Partial<Team>) => Promise<{ success: boolean; message: string }>;
+  deleteTeam: (id: string) => Promise<{ success: boolean; message: string }>;
 
   // Notification Actions
   markNotificationRead: (id: string) => Promise<void>;
@@ -216,6 +223,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // then immediately overridden by Supabase sync on mount.
   const [users, setUsers] = useState<User[]>(() => storageService.getUsers());
   const [projects, setProjects] = useState<Project[]>(() => storageService.getProjects());
+  const [teams, setTeams] = useState<Team[]>(() => storageService.getTeams());
   const [tasks, setTasks] = useState<Task[]>(() => storageService.getTasks());
   const [activities, setActivities] = useState<TaskActivity[]>(() => storageService.getActivities());
   const [notifications, setNotifications] = useState<Notification[]>(() => storageService.getNotifications());
@@ -253,6 +261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await notificationService.syncOverdueNotifications();
     const allUsers = storageService.getUsers();
     const allProjects = storageService.getProjects();
+    const allTeams = storageService.getTeams();
     const allTasks = storageService.getTasks();
     const allActivities = storageService.getActivities();
     const allNotifs = storageService.getNotifications();
@@ -260,6 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setUsers(allUsers);
     setProjects(allProjects);
+    setTeams(allTeams);
     setTasks(allTasks);
     setActivities(allActivities);
     setNotifications(allNotifs);
@@ -325,10 +335,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshAllState();
 
-    // Trigger initial cloud sync with Supabase
-    storageService.syncWithSupabase().then(() => {
-      refreshAllState();
-    });
+    // Trigger initial cloud sync with Supabase if configured
+    if (isSupabaseConfigured) {
+      storageService.syncWithSupabase().then(() => {
+        refreshAllState();
+      });
+    }
 
     const unsubscribe = storageService.subscribe(() => {
       refreshAllState();
@@ -353,8 +365,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     window.addEventListener('hashchange', handleHashChange);
 
     // Fine-grained Real-time Supabase postgres_changes listener
-    const channel = supabase
-      .channel('public:db-sync-realtime')
+    const channel = isSupabaseConfigured
+      ? supabase
+          .channel('public:db-sync-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' }, (payload) => {
         if (!payload.new) return;
         const rawTask = mapTaskRowToTask(payload.new);
@@ -373,7 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const idx = stored.findIndex((t) => t.id === normalizedTask.id);
         if (idx >= 0) stored[idx] = mergeTaskWithTimestamp(stored[idx], normalizedTask);
         else stored.unshift(normalizedTask);
-        storageService.setItem('gnt_tasks', stored);
+        storageService.setTasks(stored, false);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, (payload) => {
         if (!payload.new) return;
@@ -410,7 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const idx = stored.findIndex((t) => t.id === normalizedTask.id);
         if (idx >= 0) {
           stored[idx] = mergeTaskWithTimestamp(stored[idx], normalizedTask);
-          storageService.setItem('gnt_tasks', stored);
+          storageService.setTasks(stored, false);
         }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tasks' }, (payload) => {
@@ -418,7 +431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (deletedId) {
           setTasks((prev) => prev.filter((t) => t.id !== deletedId));
           const stored = storageService.getTasks().filter((t) => t.id !== deletedId);
-          storageService.setItem('gnt_tasks', stored);
+          storageService.setTasks(stored, false);
           setSelectedTaskId((currId) => (currId === deletedId ? null : currId));
         }
       })
@@ -491,11 +504,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       })
-      .subscribe();
+      .subscribe()
+      : null;
 
     // Fast sync when window gains focus or tab becomes visible
     const handleVisibilityOrFocus = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      if (isSupabaseConfigured && typeof document !== 'undefined' && document.visibilityState === 'visible') {
         storageService.syncWithSupabase();
       }
     };
@@ -504,17 +518,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
     // Periodic polling heartbeat (every 5 seconds) to guarantee multi-device state consistency
-    const pollInterval = setInterval(() => {
-      storageService.syncWithSupabase();
-    }, 5000);
+    const pollInterval = isSupabaseConfigured
+      ? setInterval(() => {
+          storageService.syncWithSupabase();
+        }, 5000)
+      : null;
 
     return () => {
-      clearInterval(pollInterval);
+      if (pollInterval) clearInterval(pollInterval);
       unsubscribe();
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [refreshAllState]);
 
@@ -561,7 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUser(res.user);
       showToast(
         'Account Created Successfully',
-        `Welcome to GNT Workboard, ${res.user.name}!`,
+        `Welcome to TAX WORLDD, ${res.user.name}!`,
         'success'
       );
       updateRoute(getDefaultRouteForRole(res.user.role));
@@ -932,6 +950,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return res;
   };
 
+  // Team Actions
+  const createTeam = async (data: CreateTeamPayload) => {
+    if (!currentUser) return { success: false, message: 'User not authenticated' };
+    const res = await teamService.createTeam(data, currentUser);
+    if (res.success) {
+      showToast('Team Created Successfully', `"${res.team?.name}" has been established`, 'success');
+      setTeams(storageService.getTeams());
+    } else {
+      showToast('Team Creation Failed', res.message, 'error');
+    }
+    return res;
+  };
+
+  const updateTeam = async (id: string, updates: Partial<Team>) => {
+    if (!currentUser) return { success: false, message: 'User not authenticated' };
+    const res = await teamService.updateTeam(id, updates, currentUser);
+    if (res.success) {
+      showToast('Team Updated Successfully', res.message, 'success');
+      setTeams(storageService.getTeams());
+    } else {
+      showToast('Update Failed', res.message, 'error');
+    }
+    return res;
+  };
+
+  const deleteTeam = async (id: string) => {
+    if (!currentUser) return { success: false, message: 'User not authenticated' };
+    const target = teams.find((t) => t.id === id);
+    const res = await teamService.deleteTeam(id, currentUser);
+    if (res.success) {
+      showToast('Team Removed Successfully', target ? `"${target.name}" was removed` : res.message, 'info');
+      setTeams(storageService.getTeams());
+    } else {
+      showToast('Action Prohibited', res.message, 'warning');
+    }
+    return res;
+  };
+
   // Notification Actions
   const markNotificationRead = async (id: string) => {
     await notificationService.markAsRead(id);
@@ -984,6 +1040,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         users,
         projects,
+        teams,
         tasks,
         activities,
         notifications,
@@ -1016,6 +1073,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createProject,
         updateProject,
         deleteProject,
+        createTeam,
+        updateTeam,
+        deleteTeam,
         markNotificationRead,
         markAllNotificationsRead,
         deleteNotification,

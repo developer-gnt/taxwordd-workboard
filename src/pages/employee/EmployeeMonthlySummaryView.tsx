@@ -146,7 +146,7 @@ export const EmployeeMonthlySummaryView: React.FC = () => {
             <thead>
               <tr className="bg-slate-50/80 text-slate-500 uppercase font-semibold border-b border-slate-200/80 text-[10px]">
                 <th className="py-2.5 px-4">Task</th>
-                <th className="py-2.5 px-3">Project</th>
+                <th className="py-2.5 px-3">Party</th>
                 <th className="py-2.5 px-3">Deadline</th>
                 <th className="py-2.5 px-3">Status</th>
                 <th className="py-2.5 px-3">Delivery Outcome</th>

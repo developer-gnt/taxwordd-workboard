@@ -1,6 +1,7 @@
 import { User, Project, Team, Task, TaskActivity, Notification, SystemStats } from '../types';
 import { SEED_USERS, SEED_PROJECTS, SEED_TEAMS, SEED_TASKS, SEED_ACTIVITIES, SEED_NOTIFICATIONS } from '../data/seedData';
 import { supabaseDb } from './supabaseDb';
+import { isSupabaseConfigured } from './supabaseClient';
 
 export const STORAGE_KEYS = {
   USERS: 'taxworldd_users',
@@ -42,6 +43,24 @@ class StorageService {
 
   public ensureInitialized(): void {
     try {
+      if (isSupabaseConfigured) {
+        // When Supabase is configured, PostgreSQL is the primary database.
+        // Purge all mock seed data (users, teams, projects, tasks, etc.) from localStorage
+        const cleanCloudKey = 'taxworldd_clean_all_v7';
+        if (!localStorage.getItem(cleanCloudKey)) {
+          localStorage.removeItem(STORAGE_KEYS.USERS);
+          localStorage.removeItem(STORAGE_KEYS.TEAMS);
+          localStorage.removeItem(STORAGE_KEYS.PROJECTS);
+          localStorage.removeItem(STORAGE_KEYS.TASKS);
+          localStorage.removeItem(STORAGE_KEYS.ACTIVITIES);
+          localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
+          localStorage.removeItem(STORAGE_KEYS.INITIALIZED);
+          localStorage.setItem(cleanCloudKey, 'true');
+        }
+        this.isInitialized = true;
+        return;
+      }
+
       const isInit = localStorage.getItem(STORAGE_KEYS.INITIALIZED);
       if (isInit !== 'true') {
         // Automatically purge any old demo cache keys from user's browser
@@ -137,7 +156,7 @@ class StorageService {
 
   // ==================== USERS ====================
   public getUsers(): User[] {
-    return this.getItem<User[]>(STORAGE_KEYS.USERS, SEED_USERS || []);
+    return this.getItem<User[]>(STORAGE_KEYS.USERS, isSupabaseConfigured ? [] : (SEED_USERS || []));
   }
 
   public async setUsers(users: User[], syncCloud = true): Promise<void> {
@@ -190,7 +209,7 @@ class StorageService {
 
   // ==================== PROJECTS ====================
   public getProjects(): Project[] {
-    return this.getItem<Project[]>(STORAGE_KEYS.PROJECTS, SEED_PROJECTS || []);
+    return this.getItem<Project[]>(STORAGE_KEYS.PROJECTS, isSupabaseConfigured ? [] : (SEED_PROJECTS || []));
   }
 
   public setProjects(projects: Project[], syncCloud = true): void {
@@ -239,7 +258,7 @@ class StorageService {
 
   // ==================== TEAMS ====================
   public getTeams(): Team[] {
-    return this.getItem<Team[]>(STORAGE_KEYS.TEAMS, SEED_TEAMS || []);
+    return this.getItem<Team[]>(STORAGE_KEYS.TEAMS, isSupabaseConfigured ? [] : (SEED_TEAMS || []));
   }
 
   public setTeams(teams: Team[]): void {
@@ -247,6 +266,12 @@ class StorageService {
   }
 
   public async saveTeam(team: Team): Promise<boolean> {
+    let synced = false;
+    try {
+      synced = await supabaseDb.upsertTeam(team);
+    } catch (e) {
+      console.warn('Supabase save team error:', e);
+    }
     const teams = this.getTeams();
     const idx = teams.findIndex((t) => t.id === team.id);
     if (idx >= 0) {
@@ -255,18 +280,24 @@ class StorageService {
       teams.unshift(team);
     }
     this.setItem(STORAGE_KEYS.TEAMS, teams);
-    return true;
+    return synced;
   }
 
   public async deleteTeam(teamId: string): Promise<boolean> {
+    let deleted = false;
+    try {
+      deleted = await supabaseDb.deleteTeam(teamId);
+    } catch (e) {
+      console.warn('Supabase delete team error:', e);
+    }
     const teams = this.getTeams().filter((t) => t.id !== teamId);
     this.setItem(STORAGE_KEYS.TEAMS, teams);
-    return true;
+    return deleted;
   }
 
   // ==================== TASKS ====================
   public getTasks(): Task[] {
-    return this.getItem<Task[]>(STORAGE_KEYS.TASKS, SEED_TASKS || []);
+    return this.getItem<Task[]>(STORAGE_KEYS.TASKS, isSupabaseConfigured ? [] : (SEED_TASKS || []));
   }
 
   public setTasks(tasks: Task[], syncCloud = true): void {
@@ -318,7 +349,7 @@ class StorageService {
 
   // ==================== ACTIVITIES ====================
   public getActivities(): TaskActivity[] {
-    return this.getItem<TaskActivity[]>(STORAGE_KEYS.ACTIVITIES, SEED_ACTIVITIES || []);
+    return this.getItem<TaskActivity[]>(STORAGE_KEYS.ACTIVITIES, isSupabaseConfigured ? [] : (SEED_ACTIVITIES || []));
   }
 
   public setActivities(activities: TaskActivity[], syncCloud = true): void {
@@ -337,7 +368,7 @@ class StorageService {
 
   // ==================== NOTIFICATIONS ====================
   public getNotifications(): Notification[] {
-    return this.getItem<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, SEED_NOTIFICATIONS || []);
+    return this.getItem<Notification[]>(STORAGE_KEYS.NOTIFICATIONS, isSupabaseConfigured ? [] : (SEED_NOTIFICATIONS || []));
   }
 
   public setNotifications(notifications: Notification[], syncCloud = true): void {
@@ -373,6 +404,7 @@ class StorageService {
     const localData = {
       users: this.getUsers(),
       projects: this.getProjects(),
+      teams: this.getTeams(),
       tasks: this.getTasks(),
       activities: this.getActivities(),
       notifications: this.getNotifications(),
@@ -381,6 +413,7 @@ class StorageService {
     await supabaseDb.performFullSync(localData, (cloudData) => {
       this.setItem(STORAGE_KEYS.USERS, cloudData.users);
       this.setItem(STORAGE_KEYS.PROJECTS, cloudData.projects);
+      this.setItem(STORAGE_KEYS.TEAMS, cloudData.teams);
       this.setItem(STORAGE_KEYS.TASKS, cloudData.tasks);
       this.setItem(STORAGE_KEYS.ACTIVITIES, cloudData.activities);
       this.setItem(STORAGE_KEYS.NOTIFICATIONS, cloudData.notifications);

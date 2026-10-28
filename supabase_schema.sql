@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Ensure due_date is explicitly optional in database
+ALTER TABLE public.tasks ALTER COLUMN due_date DROP NOT NULL;
+ALTER TABLE public.tasks ALTER COLUMN next_action SET DEFAULT 'Initiate deliverable';
+
 -- 5. Task Activity Audit Log Table
 CREATE TABLE IF NOT EXISTS public.activities (
   id TEXT PRIMARY KEY,

@@ -179,7 +179,21 @@ export const TeamTable: React.FC<TeamTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedUsers.map((u) => {
+              {paginatedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={canManageUsers ? 7 : 6} className="py-12 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <p className="text-sm font-bold text-slate-700">No employees found</p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                        {users.length === 0
+                          ? 'No staff accounts exist in the database. Run supabase_schema.sql in your Supabase SQL Editor to initialize staff and teams.'
+                          : 'No employees match your active search or filter.'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedUsers.map((u) => {
                 const userTasks = tasks.filter((t) => isTaskAssignedToUser(t, u));
                 const activeCount = userTasks.filter((t) => t.status !== 'DONE').length;
                 const completedCount = userTasks.filter((t) => t.status === 'DONE').length;
@@ -347,7 +361,7 @@ export const TeamTable: React.FC<TeamTableProps> = ({
                     )}
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

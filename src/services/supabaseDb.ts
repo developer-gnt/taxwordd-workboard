@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { User, Project, Task, TaskActivity, Notification } from '../types';
+import { User, Project, Team, Task, TaskActivity, Notification } from '../types';
 
 // ==================== ROW MAPPERS FOR REALTIME & QUERIES ====================
 export function mapUserRowToUser(row: any): User {
@@ -27,6 +27,21 @@ export function mapProjectRowToProject(row: any): Project {
     description: row.description || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapTeamRowToTeam(row: any): Team {
+  return {
+    id: row.id,
+    name: row.name,
+    department: row.department || '',
+    description: row.description || '',
+    leadId: row.lead_id || undefined,
+    leadName: row.lead_name || undefined,
+    memberIds: Array.isArray(row.member_ids) ? row.member_ids : [],
+    color: row.color || 'blue',
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
@@ -92,6 +107,22 @@ export function mapActivityRowToActivity(row: any): TaskActivity {
 
 export class SupabaseDbService {
   private isSyncing = false;
+  public dbStatus: 'CONNECTED' | 'SCHEMA_PENDING' | 'DISCONNECTED' | 'CHECKING' = 'CHECKING';
+
+  public checkSchemaError(error: any) {
+    if (!error) return;
+    if (
+      error.code === '42P01' ||
+      error.code === 'PGRST205' ||
+      error.message?.includes('relation') ||
+      error.message?.includes('does not exist') ||
+      error.message?.includes('schema cache')
+    ) {
+      this.dbStatus = 'SCHEMA_PENDING';
+    } else {
+      this.dbStatus = 'DISCONNECTED';
+    }
+  }
 
   // ==================== USERS ====================
   public async fetchUsers(): Promise<User[] | null> {
@@ -100,8 +131,10 @@ export class SupabaseDbService {
       const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: true });
       if (error) {
         console.warn('Supabase fetchUsers warning:', error.message);
+        this.checkSchemaError(error);
         return null;
       }
+      this.dbStatus = 'CONNECTED';
       if (!data) return [];
       return data.map(mapUserRowToUser);
     } catch (e) {
@@ -203,8 +236,10 @@ export class SupabaseDbService {
       const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: true });
       if (error) {
         console.warn('Supabase fetchProjects warning:', error.message);
+        this.checkSchemaError(error);
         return null;
       }
+      this.dbStatus = 'CONNECTED';
       if (!data) return [];
       return data.map(mapProjectRowToProject);
     } catch (e) {
@@ -276,6 +311,83 @@ export class SupabaseDbService {
     }
   }
 
+  // ==================== TEAMS ====================
+  public async fetchTeams(): Promise<Team[] | null> {
+    if (!isSupabaseConfigured) return null;
+    try {
+      const { data, error } = await supabase.from('teams').select('*').order('created_at', { ascending: true });
+      if (error) {
+        console.warn('Supabase fetchTeams warning:', error.message);
+        this.checkSchemaError(error);
+        return null;
+      }
+      if (!data) return [];
+      return data.map(mapTeamRowToTeam);
+    } catch (e) {
+      console.warn('Supabase fetchTeams exception:', e);
+      return null;
+    }
+  }
+
+  public async upsertTeam(team: Team): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
+    try {
+      const payload = {
+        id: team.id,
+        name: team.name,
+        department: team.department || '',
+        description: team.description || '',
+        lead_id: team.leadId || null,
+        lead_name: team.leadName || null,
+        member_ids: team.memberIds || [],
+        color: team.color || 'blue',
+        created_at: team.createdAt,
+        updated_at: team.updatedAt,
+      };
+      const { error } = await supabase.from('teams').upsert(payload, { onConflict: 'id' });
+      if (error) {
+        console.error('Supabase upsertTeam error:', error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Supabase upsertTeam exception:', e);
+      return false;
+    }
+  }
+
+  public async upsertTeams(teams: Team[]): Promise<boolean> {
+    if (!isSupabaseConfigured || teams.length === 0) return true;
+    try {
+      const payloads = teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        department: t.department || '',
+        description: t.description || '',
+        lead_id: t.leadId || null,
+        lead_name: t.leadName || null,
+        member_ids: t.memberIds || [],
+        color: t.color || 'blue',
+        created_at: t.createdAt,
+        updated_at: t.updatedAt,
+      }));
+      const { error } = await supabase.from('teams').upsert(payloads, { onConflict: 'id' });
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  public async deleteTeam(teamId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
+    try {
+      const { error } = await supabase.from('teams').delete().eq('id', teamId);
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
   // ==================== TASKS ====================
   public async fetchTasks(): Promise<Task[] | null> {
     if (!isSupabaseConfigured) return null;
@@ -283,8 +395,10 @@ export class SupabaseDbService {
       const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
       if (error) {
         console.warn('Supabase fetchTasks warning:', error.message);
+        this.checkSchemaError(error);
         return null;
       }
+      this.dbStatus = 'CONNECTED';
       if (!data) return [];
       return data.map(mapTaskRowToTask);
     } catch (e) {
@@ -615,6 +729,7 @@ export class SupabaseDbService {
     localData: {
       users: User[];
       projects: Project[];
+      teams?: Team[];
       tasks: Task[];
       activities: TaskActivity[];
       notifications: Notification[];
@@ -622,6 +737,7 @@ export class SupabaseDbService {
     onSynced: (cloudData: {
       users: User[];
       projects: Project[];
+      teams: Team[];
       tasks: Task[];
       activities: TaskActivity[];
       notifications: Notification[];
@@ -632,148 +748,30 @@ export class SupabaseDbService {
     this.isSyncing = true;
 
     try {
-      const [remoteUsers, remoteProjects, remoteTasks, remoteActivities, remoteNotifs] =
+      const [remoteUsers, remoteProjects, remoteTeams, remoteTasks, remoteActivities, remoteNotifs] =
         await Promise.all([
           this.fetchUsers(),
           this.fetchProjects(),
+          this.fetchTeams(),
           this.fetchTasks(),
           this.fetchActivities(),
           this.fetchNotifications(),
         ]);
 
-      let finalUsers = localData.users;
-      let finalProjects = localData.projects;
-      let finalTasks = localData.tasks;
-      let finalActivities = localData.activities;
-      let finalNotifs = localData.notifications;
-
-      // Timestamp-aware Last-Write-Wins merge for users
-      if (remoteUsers !== null) {
-        if (remoteUsers.length > 0) {
-          const localMap = new Map(localData.users.map((u) => [u.id, u]));
-          const merged: User[] = [];
-          const toPush: User[] = [];
-
-          for (const rUser of remoteUsers) {
-            const lUser = localMap.get(rUser.id);
-            if (!lUser) {
-              merged.push(rUser);
-            } else {
-              const lTime = new Date(lUser.updatedAt || lUser.createdAt || 0).getTime();
-              const rTime = new Date(rUser.updatedAt || rUser.createdAt || 0).getTime();
-              if (lTime > rTime) {
-                merged.push(lUser);
-                toPush.push(lUser);
-              } else {
-                merged.push(rUser);
-              }
-            }
-          }
-
-          // Note: We do NOT push missing local users back to remote.
-          // If a user was deleted on Supabase, local cache must accept the deletion, not revive it.
-          finalUsers = merged;
-          if (toPush.length > 0) {
-            this.upsertUsers(toPush).catch(() => {});
-          }
-        } else if (localData.users.length > 0) {
-          // If remote is completely empty on initial setup, we sync local
-          await this.upsertUsers(localData.users);
-        } else {
-          finalUsers = [];
-        }
-      }
-
-      // Timestamp-aware Last-Write-Wins merge for projects
-      if (remoteProjects !== null) {
-        if (remoteProjects.length > 0) {
-          const localMap = new Map(localData.projects.map((p) => [p.id, p]));
-          const merged: Project[] = [];
-          const toPush: Project[] = [];
-
-          for (const rProj of remoteProjects) {
-            const lProj = localMap.get(rProj.id);
-            if (!lProj) {
-              merged.push(rProj);
-            } else {
-              const lTime = new Date(lProj.updatedAt || lProj.createdAt || 0).getTime();
-              const rTime = new Date(rProj.updatedAt || rProj.createdAt || 0).getTime();
-              if (lTime > rTime) {
-                merged.push(lProj);
-                toPush.push(lProj);
-              } else {
-                merged.push(rProj);
-              }
-            }
-          }
-
-          // Note: We do NOT push missing local projects back to remote.
-          finalProjects = merged;
-          if (toPush.length > 0) {
-            this.upsertProjects(toPush).catch(() => {});
-          }
-        } else if (localData.projects.length > 0) {
-          await this.upsertProjects(localData.projects);
-        } else {
-          finalProjects = [];
-        }
-      }
-
-      // Supabase-authoritative merge for tasks:
-      // - Supabase is the source of truth for all existing tasks
-      // - Local-only tasks (offline / pre-.env) are pushed to Supabase immediately
-      if (remoteTasks !== null) {
-        if (remoteTasks.length > 0) {
-          const remoteIds = new Set(remoteTasks.map((t) => t.id));
-          const localOnlyTasks: Task[] = [];
-
-          for (const lTask of localData.tasks) {
-            if (!remoteIds.has(lTask.id)) {
-              // Local-only task — push it to Supabase immediately
-              localOnlyTasks.push(lTask);
-            }
-          }
-
-          // Push all local-only tasks to Supabase
-          if (localOnlyTasks.length > 0) {
-            console.log(`[Sync] Pushing ${localOnlyTasks.length} local-only task(s) to Supabase:`,
-              localOnlyTasks.map((t) => t.title));
-            for (const t of localOnlyTasks) {
-              this.upsertTask(t).catch(() => {});
-            }
-          }
-
-          // Final state = Supabase tasks (authoritative) + local-only items
-          finalTasks = [...localOnlyTasks, ...remoteTasks];
-        } else if (localData.tasks.length > 0) {
-          // Supabase is completely empty — push everything from local (initial setup)
-          console.log(`[Sync] Supabase empty, pushing ${localData.tasks.length} local tasks on initial setup.`);
-          await this.upsertTasks(localData.tasks);
-          finalTasks = localData.tasks;
-        } else {
-          finalTasks = [];
-        }
-      }
-
-      if (remoteActivities !== null) {
-        if (remoteActivities.length > 0) {
-          finalActivities = remoteActivities;
-        } else if (localData.activities.length > 0) {
-          await this.upsertActivities(localData.activities);
-        }
-      }
-
-      if (remoteNotifs !== null) {
-        if (remoteNotifs.length > 0) {
-          finalNotifs = remoteNotifs;
-        } else if (localData.notifications.length > 0) {
-          await this.upsertNotifications(localData.notifications);
-        }
-      }
+      // STRICT DATABASE-FIRST DATA:
+      // When Supabase is configured, all data comes exclusively from the database.
+      // If tables don't exist yet (null), collections are strictly empty [] (0 records).
+      const finalUsers: User[] = remoteUsers !== null ? remoteUsers : [];
+      const finalProjects: Project[] = remoteProjects !== null ? remoteProjects : [];
+      const finalTeams: Team[] = remoteTeams !== null ? remoteTeams : [];
+      const finalTasks: Task[] = remoteTasks !== null ? remoteTasks : [];
+      const finalActivities: TaskActivity[] = remoteActivities !== null ? remoteActivities : [];
+      const finalNotifs: Notification[] = remoteNotifs !== null ? remoteNotifs : [];
 
       onSynced({
         users: finalUsers,
         projects: finalProjects,
+        teams: finalTeams,
         tasks: finalTasks,
         activities: finalActivities,
         notifications: finalNotifs,

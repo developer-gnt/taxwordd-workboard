@@ -16,6 +16,7 @@ import { AdminSettings } from './pages/admin/AdminSettings';
 import { EmployeeMonthlySummaryView } from './pages/employee/EmployeeMonthlySummaryView';
 import { EmployeeProfileView } from './pages/employee/EmployeeProfileView';
 import { BrowserNotificationBanner } from './components/notifications/BrowserNotificationBanner';
+import { DatabaseStatusBanner } from './components/common/DatabaseStatusBanner';
 
 // Modals & Drawers
 import { TaskCreateModal } from './components/tasks/TaskCreateModal';
@@ -167,6 +168,9 @@ const MainAppLayout: React.FC = () => {
       >
         {/* Browser Notification Banner Prompt */}
         <BrowserNotificationBanner />
+
+        {/* Database Status Banner (shown when tables need creation or offline) */}
+        <DatabaseStatusBanner />
 
         {/* Topbar */}
         <Topbar

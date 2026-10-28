@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GntLogo } from '../../components/common/GntLogo';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { DatabaseStatusBanner } from '../../components/common/DatabaseStatusBanner';
 import { UserRole } from '../../types';
 import {
   ShieldCheck,
@@ -125,8 +126,12 @@ export const LoginView: React.FC = () => {
   const selectedUserObj = users.find((u) => u.id === selectedUserId) || users[0];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-center sm:px-6 lg:px-8">
+      <div className="w-full fixed top-0 left-0 z-50">
+        <DatabaseStatusBanner />
+      </div>
+      <div className="py-12">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         {/* Official GNT Logo */}
         <div className="flex justify-center mb-4">
           <GntLogo variant="full" size="xl" className="drop-shadow-xs" />
@@ -255,20 +260,26 @@ export const LoginView: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Select Team Account
                 </label>
-                <select
-                  value={selectedUserId || activeUsers[0]?.id || ''}
-                  onChange={(e) => {
-                    setSelectedUserId(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
-                >
-                  {activeUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} — {u.role} ({u.department || 'Operations'})
-                    </option>
-                  ))}
-                </select>
+                {activeUsers.length === 0 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
+                    No staff accounts found in database. Run <strong>supabase_schema.sql</strong> in your Supabase SQL Editor to initialize staff accounts and teams.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedUserId || activeUsers[0]?.id || ''}
+                    onChange={(e) => {
+                      setSelectedUserId(e.target.value);
+                      setError('');
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-900 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    {activeUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} — {u.role} ({u.department || 'Operations'})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {selectedUserObj && (
@@ -419,6 +430,7 @@ export const LoginView: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 

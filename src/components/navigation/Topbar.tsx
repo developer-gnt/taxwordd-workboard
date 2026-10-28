@@ -10,6 +10,8 @@ import {
   UserCheck,
   Calendar,
   Cloud,
+  CloudOff,
+  AlertTriangle,
   RefreshCw,
   Volume2,
 } from 'lucide-react';
@@ -43,6 +45,8 @@ export const Topbar: React.FC<TopbarProps> = ({
     markAllNotificationsRead,
     navigateTo,
     openTaskDetail,
+    dbStatus,
+    refreshDbStatus,
   } = useApp();
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
@@ -86,6 +90,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     setIsSyncing(true);
     try {
       await storageService.syncWithSupabase();
+      await refreshDbStatus();
     } finally {
       setTimeout(() => setIsSyncing(false), 600);
     }
@@ -125,12 +130,12 @@ export const Topbar: React.FC<TopbarProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+        <div className="min-w-0">
+          <h1 className="text-sm sm:text-lg md:text-xl font-bold text-slate-900 tracking-tight truncate max-w-[155px] xs:max-w-[210px] sm:max-w-none">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-xs text-slate-500 hidden sm:block font-normal mt-0.5">
+            <p className="text-xs text-slate-500 hidden sm:block font-normal mt-0.5 truncate">
               {subtitle}
             </p>
           )}
@@ -138,20 +143,44 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Live Cloud Sync Pill */}
+        {/* Cloud Sync Status Pill */}
         <button
           id="btn-topbar-cloud-sync"
           onClick={handleManualSync}
           disabled={isSyncing}
-          title="Click to manually synchronize with Supabase PostgreSQL cloud"
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-medium text-slate-600 shadow-2xs transition-colors cursor-pointer"
+          title={
+            dbStatus === 'SCHEMA_PENDING'
+              ? 'Connected to Supabase, but database tables need to be created using supabase_schema.sql'
+              : dbStatus === 'DISCONNECTED'
+              ? 'Cannot connect to Supabase database. Click to retry.'
+              : 'Synchronized with Supabase PostgreSQL cloud'
+          }
+          className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium shadow-2xs transition-colors cursor-pointer ${
+            dbStatus === 'SCHEMA_PENDING'
+              ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+              : dbStatus === 'DISCONNECTED'
+              ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
         >
           {isSyncing ? (
             <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+          ) : dbStatus === 'SCHEMA_PENDING' ? (
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+          ) : dbStatus === 'DISCONNECTED' ? (
+            <CloudOff className="w-3.5 h-3.5 text-rose-600" />
           ) : (
             <Cloud className="w-3.5 h-3.5 text-emerald-600" />
           )}
-          <span className="hidden lg:inline">{isSyncing ? 'Syncing...' : 'Live Sync'}</span>
+          <span className="hidden lg:inline">
+            {isSyncing
+              ? 'Syncing...'
+              : dbStatus === 'SCHEMA_PENDING'
+              ? 'DB: Tables Missing'
+              : dbStatus === 'DISCONNECTED'
+              ? 'DB: Offline'
+              : 'Live Sync'}
+          </span>
         </button>
 
         {/* Date context display */}

@@ -16,6 +16,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { notificationService } from '../../services/notificationService';
+import { SUPABASE_URL } from '../../services/supabaseClient';
 
 export const AdminSettings: React.FC = () => {
   const { users, tasks, projects, activities, notifications, resetToDemoData, showToast } = useApp();
@@ -284,7 +285,7 @@ const SupabaseSettingsCard: React.FC = () => {
     } catch (e: any) {
       setTestResult({
         connected: false,
-        url: 'https://rshefuocexrhiklqqfkx.supabase.co',
+        url: SUPABASE_URL,
         error: e.message,
       });
     } finally {
@@ -313,7 +314,7 @@ const SupabaseSettingsCard: React.FC = () => {
                 Active & Configured
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-mono break-all">https://rshefuocexrhiklqqfkx.supabase.co</p>
+            <p className="text-xs text-slate-500 font-mono break-all">{SUPABASE_URL}</p>
           </div>
         </div>
 

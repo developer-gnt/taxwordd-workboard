@@ -14,7 +14,7 @@ interface TaskEditModalProps {
 }
 
 export const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, isOpen, onClose }) => {
-  const { projects, users, updateTaskMetadata, currentUser } = useApp();
+  const { projects, users, teams, updateTaskMetadata, currentUser } = useApp();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -171,6 +171,7 @@ export const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, isOpen, onCl
               <UserCombobox
                 id="edit-task-assignee"
                 users={assignees}
+                teams={teams}
                 value={assignedEmployeeId}
                 onChange={setAssignedEmployeeId}
                 placeholder="Select Owner (Employee, Manager, Admin)..."

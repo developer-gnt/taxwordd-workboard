@@ -56,6 +56,11 @@ interface AppContextType {
     dueDate?: string;
   };
 
+  // Database Connection Health
+  dbStatus: 'CHECKING' | 'CONNECTED' | 'SCHEMA_PENDING' | 'DISCONNECTED' | 'OFFLINE_MODE';
+  dbStatusMessage?: string;
+  refreshDbStatus: () => Promise<void>;
+
   // Actions
   login: (userId: string, pin: string) => Promise<LoginResult>;
   signInWithEmail: (email: string, password: string) => Promise<LoginResult>;
@@ -238,6 +243,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dueDate: '',
   }));
 
+  // Database Connection State
+  const [dbStatus, setDbStatus] = useState<'CHECKING' | 'CONNECTED' | 'SCHEMA_PENDING' | 'DISCONNECTED' | 'OFFLINE_MODE'>(
+    () => (!isSupabaseConfigured ? 'OFFLINE_MODE' : 'CHECKING')
+  );
+  const [dbStatusMessage, setDbStatusMessage] = useState<string>('');
+
+  const refreshDbStatus = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setDbStatus('OFFLINE_MODE');
+      setDbStatusMessage('Running in offline / local storage mode');
+      return;
+    }
+    try {
+      const { testSupabaseConnection } = await import('../services/supabaseClient');
+      const res = await testSupabaseConnection();
+      if (
+        res.error?.includes('schema') ||
+        res.error?.includes('table') ||
+        res.error?.includes('42P01') ||
+        res.error?.includes('PGRST205') ||
+        res.error?.includes('does not exist') ||
+        res.error?.includes('schema cache')
+      ) {
+        setDbStatus('SCHEMA_PENDING');
+        setDbStatusMessage('Connected to Supabase, but database tables need to be created using supabase_schema.sql.');
+      } else if (res.connected) {
+        setDbStatus('CONNECTED');
+        setDbStatusMessage('Connected to Supabase cloud database.');
+      } else {
+        setDbStatus('DISCONNECTED');
+        setDbStatusMessage(res.error || 'Cannot connect to Supabase database.');
+      }
+    } catch (e: any) {
+      setDbStatus('DISCONNECTED');
+      setDbStatusMessage(e?.message || 'Connection check failed');
+    }
+  }, []);
+
   // Tracks notification IDs already seen by the current user to detect new ones
   const prevNotifIdsRef = useRef<Set<string>>(new Set());
   const prevUserIdRef = useRef<string | null>(null);
@@ -334,11 +377,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     refreshAllState();
+    refreshDbStatus();
 
     // Trigger initial cloud sync with Supabase if configured
     if (isSupabaseConfigured) {
       storageService.syncWithSupabase().then(() => {
         refreshAllState();
+        refreshDbStatus();
       });
     }
 
@@ -1081,6 +1126,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteNotification,
         clearNotifications,
         resetToDemoData,
+        dbStatus,
+        dbStatusMessage,
+        refreshDbStatus,
       }}
     >
       {children}

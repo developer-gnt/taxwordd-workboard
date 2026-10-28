@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { SUPABASE_URL, SUPABASE_SQL_SCHEMA } from '../../services/supabaseClient';
 import { AlertTriangle, Copy, Check, ExternalLink, RefreshCw } from 'lucide-react';
 
+
 export const DatabaseStatusBanner: React.FC = () => {
   const { dbStatus, refreshDbStatus } = useApp();
   const [copied, setCopied] = useState(false);
